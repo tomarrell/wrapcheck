@@ -51,12 +51,9 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				xIden, ok := sel.X.(*ast.Ident)
-				if !ok {
-					return true
-				}
-
-				if _, ok := pass.TypesInfo.ObjectOf(xIden).(*types.PkgName); !ok {
+				// If it's not a package name, then we should check the selector to
+				// make sure that it's an identifier from the same package
+				if pass.Pkg.Path() == pass.TypesInfo.ObjectOf(sel.Sel).Pkg().Path() {
 					return true
 				}
 
