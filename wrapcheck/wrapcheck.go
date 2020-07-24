@@ -25,6 +25,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 
+			// Iterate over the values to be returned looking for errors
 			for _, res := range ret.Results {
 				if !isError(pass.TypesInfo.TypeOf(res)) {
 					continue
@@ -42,6 +43,20 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 				call, ok := ass.Rhs[0].(*ast.CallExpr)
 				if !ok {
+					return true
+				}
+
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+
+				xIden, ok := sel.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+
+				if _, ok := pass.TypesInfo.ObjectOf(xIden).(*types.PkgName); !ok {
 					return true
 				}
 

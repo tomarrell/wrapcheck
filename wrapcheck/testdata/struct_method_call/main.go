@@ -1,6 +1,10 @@
 package main
 
-import "errors"
+import (
+	"errors"
+
+	"encoding/json"
+)
 
 func main() {
 	do()
@@ -12,6 +16,8 @@ func do() error {
 	if err != nil {
 		return err
 	}
+
+	json.Marshal(struct{}{})
 
 	return nil
 }
