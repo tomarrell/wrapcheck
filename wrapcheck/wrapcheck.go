@@ -1,59 +1,55 @@
 package wrapcheck
 
 import (
-	"flag"
 	"go/ast"
 	"go/types"
 
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/tools/go/analysis"
 )
 
 var Analyzer = &analysis.Analyzer{
 	Name: "wrapcheck",
 	Doc:  "Checks that errors returned from external packages are wrapped",
-	Flags: flag.FlagSet{
-		Usage: func() { panic("not implemented") },
-	},
-	Run: run,
+	Run:  run,
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {
-			ass, ok := n.(*ast.AssignStmt)
+			ret, ok := n.(*ast.ReturnStmt)
 			if !ok {
 				return true
 			}
 
-			if len(ass.Rhs) < 1 {
+			if len(ret.Results) < 1 {
 				return true
 			}
 
-			call, ok := ass.Rhs[0].(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-
-			if !isPackageCall(call.Fun) {
-				return true
-			}
-
-			spew.Dump(call)
-
-			for _, expr := range ass.Lhs {
-				typ := pass.TypesInfo.TypeOf(expr)
-				if !isError(typ) {
-					return true
+			for _, res := range ret.Results {
+				if !isError(pass.TypesInfo.TypeOf(res)) {
+					continue
 				}
 
-				spew.Dump(expr)
-				ident, ok := expr.(*ast.Ident)
+				ident, ok := res.(*ast.Ident)
 				if !ok {
 					return true
 				}
 
-				spew.Dump(ident)
+				ass, ok := ident.Obj.Decl.(*ast.AssignStmt)
+				if !ok {
+					return true
+				}
+
+				call, ok := ass.Rhs[0].(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+
+				if !isPackageCall(call.Fun) {
+					return true
+				}
+
+				pass.Reportf(ident.NamePos, "error returned from external package is unwrapped")
 			}
 
 			return true
