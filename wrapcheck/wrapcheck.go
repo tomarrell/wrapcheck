@@ -17,7 +17,15 @@ var Analyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
+		// TODO store the last error as
+		var _ *ast.AssignStmt
+
 		ast.Inspect(file, func(n ast.Node) bool {
+			if _, ok := n.(*ast.AssignStmt); ok {
+				// TODO save the most recent error assignment
+				return true
+			}
+
 			ret, ok := n.(*ast.ReturnStmt)
 			if !ok {
 				return true
