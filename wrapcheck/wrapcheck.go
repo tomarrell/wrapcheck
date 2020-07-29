@@ -36,13 +36,28 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				ass, ok := ident.Obj.Decl.(*ast.AssignStmt)
-				if !ok {
-					return true
-				}
+				var (
+					call *ast.CallExpr
+				)
 
-				call, ok := ass.Rhs[0].(*ast.CallExpr)
-				if !ok {
+				// Try to pull out an *ast.CallExpr from either a short assignment `:=`
+				// or a long assignment `var`/`const`
+				if ass, ok := ident.Obj.Decl.(*ast.AssignStmt); ok {
+					// first check for a short assignment
+					call, ok = ass.Rhs[0].(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+				} else if vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
+					// check for a long assignment or const
+					if len(vSpec.Values) < 1 {
+						return true
+					}
+					call, ok = vSpec.Values[0].(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+				} else {
 					return true
 				}
 
