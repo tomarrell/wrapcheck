@@ -7,6 +7,8 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+const errPkgName = "errors"
+
 var Analyzer = &analysis.Analyzer{
 	Name: "wrapcheck",
 	Doc:  "Checks that errors returned from external packages are wrapped",
@@ -66,9 +68,17 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
+				// The package of the function that we are calling which returns the
+				// error
+				funcPkg := pass.TypesInfo.ObjectOf(sel.Sel).Pkg()
+
 				// If it's not a package name, then we should check the selector to
 				// make sure that it's an identifier from the same package
-				if pass.Pkg.Path() == pass.TypesInfo.ObjectOf(sel.Sel).Pkg().Path() {
+				if pass.Pkg.Path() == funcPkg.Path() {
+					return true
+				} else if funcPkg.Name() == errPkgName {
+					// Ignore the error if it's returned by something in the "errors"
+					// package, e.g. errors.New(...)
 					return true
 				}
 
