@@ -1,6 +1,7 @@
 package wrapcheck
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 
@@ -8,6 +9,10 @@ import (
 )
 
 const errorsPkgName = "errors"
+
+var ignoredIDs = []string{
+	"func fmt.Errorf(format string, a ...interface{}) error",
+}
 
 var Analyzer = &analysis.Analyzer{
 	Name: "wrapcheck",
@@ -63,7 +68,8 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					} else {
 						// We couldn't find a short or var assign for this error return.
 						// This is an error. Where did this identifier come from?
-						panic("error: no declaration for variable")
+						fmt.Println("No assignment for error:", pass.Fset.Position(ident.NamePos))
+						return true
 					}
 				} else {
 					// Try to pull out an *ast.CallExpr from either a short assignment `:=`
@@ -81,15 +87,17 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 				// The package of the function that we are calling which returns the
 				// error
-				funcPkg := pass.TypesInfo.ObjectOf(sel.Sel).Pkg()
+				fn := pass.TypesInfo.ObjectOf(sel.Sel)
 
 				// If it's not a package name, then we should check the selector to
 				// make sure that it's an identifier from the same package
-				if pass.Pkg.Path() == funcPkg.Path() {
+				if pass.Pkg.Path() == fn.Pkg().Path() {
 					return true
-				} else if funcPkg.Name() == errorsPkgName {
+				} else if fn.Pkg().Name() == errorsPkgName {
 					// Ignore the error if it's returned by something in the "errors"
 					// package, e.g. errors.New(...)
+					return true
+				} else if contains(ignoredIDs, fn.String()) {
 					return true
 				}
 
@@ -158,6 +166,15 @@ func isPackageCall(expr ast.Expr) bool {
 	_, ok := expr.(*ast.SelectorExpr)
 
 	return ok
+}
+
+func contains(slice []string, el string) bool {
+	for _, s := range slice {
+		if s == el {
+			return true
+		}
+	}
+	return false
 }
 
 func isError(typ types.Type) bool {
