@@ -11,5 +11,5 @@ func main() {
 }
 
 func do() ([]byte, error) {
-	return json.Marshal(struct{}{}) // want `error returned from external package is unwrapped`
+	return json.Marshal(struct{}{}) // TODO want `error returned from external package is unwrapped`
 }

@@ -50,38 +50,49 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					call *ast.CallExpr
 				)
 
-				assign := prevErrAssign(pass, file, ident)
+				// Attempt to find the most recent short assign
+				if shortAss := prevErrAssign(pass, file, ident); shortAss != nil {
+					call, ok = shortAss.Rhs[0].(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+				} else if isUnresolved(file, ident) {
+					// TODO Check if the identifier is unresolved, and try to resolve it in
+					// another file.
+					return true
+				} else {
+					// Check for ValueSpec nodes in order to locate a possible var
+					// declaration.
+					if ident.Obj == nil {
+						return true
+					}
 
-				// If assign is nil, then we should check for ValueSpec nodes in order
-				// to locate a possible var declaration
-				if assign == nil {
-					// Check if the declaration is a long assignment or const
-					if vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
-						if len(vSpec.Values) < 1 {
-							return true
-						}
-						call, ok = vSpec.Values[0].(*ast.CallExpr)
-						if !ok {
-							return true
-						}
-					} else {
+					vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec)
+					if !ok {
 						// We couldn't find a short or var assign for this error return.
 						// This is an error. Where did this identifier come from? Possibly a
 						// function param.
 						//
 						// TODO decide how to handle this case, whether to follow function
 						// param back, or assert wrapping at call site.
-						//
-						// fmt.Println("No assignment for error:", pass.Fset.Position(ident.NamePos))
+
 						return true
 					}
-				} else {
-					// Try to pull out an *ast.CallExpr from either a short assignment `:=`
-					// or a long assignment `var`/`const`
-					call, ok = assign.Rhs[0].(*ast.CallExpr)
+
+					if len(vSpec.Values) < 1 {
+						return true
+					}
+
+					call, ok = vSpec.Values[0].(*ast.CallExpr)
 					if !ok {
 						return true
 					}
+				}
+
+				// Make sure there is a call identified as producing the error being
+				// returned, otherwise just bail
+				if call == nil {
+					return true
 				}
 
 				sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -134,7 +145,11 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 					continue
 				}
 				if assIdent, ok := expr.(*ast.Ident); ok {
-					if assIdent.Obj.Decl == returnIdent.Obj.Decl {
+					if assIdent.Obj == nil || returnIdent.Obj == nil {
+						// If we can't find the Obj for one of the identifiers, just skip
+						// it.
+						return true
+					} else if assIdent.Obj.Decl == returnIdent.Obj.Decl {
 						assigns = append(assigns, ass)
 					}
 				}
@@ -164,6 +179,7 @@ func contains(slice []string, el string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -174,4 +190,14 @@ func isError(typ types.Type) bool {
 	}
 
 	return typ.String() == "error"
+}
+
+func isUnresolved(file *ast.File, ident *ast.Ident) bool {
+	for _, unresolvedIdent := range file.Unresolved {
+		if unresolvedIdent.Pos() == ident.Pos() {
+			return true
+		}
+	}
+
+	return false
 }
