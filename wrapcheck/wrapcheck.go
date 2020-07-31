@@ -42,56 +42,17 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				returnPos := ident.Pos()
-
-				// This is the original declaration
-				sourceDecl := ident.Obj.Decl
-
-				// A slice containing all the assignments which contain an identifer
-				// referring to the source declaration of the error. This is to catch
-				// cases where err is defined once, and then reassigned multiple times
-				// within the same block. In these cases, we should check the method of
-				// the most recent call.
-				var assigns []*ast.AssignStmt
-
-				// Find all assignments which have the same declaration
-				ast.Inspect(file, func(n ast.Node) bool {
-					if ass, ok := n.(*ast.AssignStmt); ok {
-						for _, expr := range ass.Lhs {
-							if !isError(pass.TypesInfo.TypeOf(expr)) {
-								continue
-							}
-							if assIdent, ok := expr.(*ast.Ident); ok {
-								if assIdent.Obj.Decl == sourceDecl {
-									assigns = append(assigns, ass)
-								}
-							}
-						}
-					}
-
-					return true
-				})
-
-				// Iterate through the assignments, comparing the token positions to
-				// find the assignment that directly precedes the return position
-				var mostRecentAssign *ast.AssignStmt
-
-				for _, ass := range assigns {
-					if ass.Pos() > returnPos {
-						break
-					}
-					mostRecentAssign = ass
-				}
-
 				var (
 					call *ast.CallExpr
 				)
 
-				// If the mostRecentAssign is nil, then we should check for ValueSpec
-				// nodes in order to locate a possible var declaration
-				if mostRecentAssign == nil {
+				assign := prevErrAssign(pass, file, ident)
+
+				// If assign is nil, then we should check for ValueSpec nodes in order
+				// to locate a possible var declaration
+				if assign == nil {
+					// Check if the declaration is a long assignment or const
 					if vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
-						// check for a long assignment or const
 						if len(vSpec.Values) < 1 {
 							return true
 						}
@@ -101,15 +62,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 						}
 					} else {
 						// We couldn't find a short or var assign for this error return.
-						// This is an error.
+						// This is an error. Where did this identifier come from?
 						panic("error: no declaration for variable")
 					}
 				} else {
 					// Try to pull out an *ast.CallExpr from either a short assignment `:=`
 					// or a long assignment `var`/`const`
-					// if ass, ok := mostRecentAssign.(*ast.AssignStmt); ok {
-					// first check for a short assignment
-					call, ok = mostRecentAssign.Rhs[0].(*ast.CallExpr)
+					call, ok = assign.Rhs[0].(*ast.CallExpr)
 					if !ok {
 						return true
 					}
@@ -146,6 +105,53 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+// prevErrAssign traverses the AST of a file looking for the most recent
+// assignment to an error declaration which is specified by the returnIdent
+// identifier.
+//
+// This only returns short form assignments and reassignments, e.g. `:=` and
+// `=`. This does not include `var` statements. This function will return nil if
+// the only declaration is a `var` (aka ValueSpec) declaration.
+func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) *ast.AssignStmt {
+	// A slice containing all the assignments which contain an identifer
+	// referring to the source declaration of the error. This is to catch
+	// cases where err is defined once, and then reassigned multiple times
+	// within the same block. In these cases, we should check the method of
+	// the most recent call.
+	var assigns []*ast.AssignStmt
+
+	// Find all assignments which have the same declaration
+	ast.Inspect(file, func(n ast.Node) bool {
+		if ass, ok := n.(*ast.AssignStmt); ok {
+			for _, expr := range ass.Lhs {
+				if !isError(pass.TypesInfo.TypeOf(expr)) {
+					continue
+				}
+				if assIdent, ok := expr.(*ast.Ident); ok {
+					if assIdent.Obj.Decl == returnIdent.Obj.Decl {
+						assigns = append(assigns, ass)
+					}
+				}
+			}
+		}
+
+		return true
+	})
+
+	// Iterate through the assignments, comparing the token positions to
+	// find the assignment that directly precedes the return position
+	var mostRecentAssign *ast.AssignStmt
+
+	for _, ass := range assigns {
+		if ass.Pos() > returnIdent.Pos() {
+			break
+		}
+		mostRecentAssign = ass
+	}
+
+	return mostRecentAssign
 }
 
 func isPackageCall(expr ast.Expr) bool {
