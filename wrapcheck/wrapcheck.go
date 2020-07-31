@@ -1,17 +1,16 @@
 package wrapcheck
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 )
 
-const errorsPkgName = "errors"
-
 var ignoredIDs = []string{
 	"func fmt.Errorf(format string, a ...interface{}) error",
+	"func errors.New(text string) error",
+	"func errors.Unwrap(err error) error",
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -67,8 +66,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 						}
 					} else {
 						// We couldn't find a short or var assign for this error return.
-						// This is an error. Where did this identifier come from?
-						fmt.Println("No assignment for error:", pass.Fset.Position(ident.NamePos))
+						// This is an error. Where did this identifier come from? Possibly a
+						// function param.
+						//
+						// TODO decide how to handle this case, whether to follow function
+						// param back, or assert wrapping at call site.
+						//
+						// fmt.Println("No assignment for error:", pass.Fset.Position(ident.NamePos))
 						return true
 					}
 				} else {
@@ -93,15 +97,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				// make sure that it's an identifier from the same package
 				if pass.Pkg.Path() == fn.Pkg().Path() {
 					return true
-				} else if fn.Pkg().Name() == errorsPkgName {
-					// Ignore the error if it's returned by something in the "errors"
-					// package, e.g. errors.New(...)
-					return true
 				} else if contains(ignoredIDs, fn.String()) {
-					return true
-				}
-
-				if !isPackageCall(call.Fun) {
 					return true
 				}
 
@@ -162,12 +158,6 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 	return mostRecentAssign
 }
 
-func isPackageCall(expr ast.Expr) bool {
-	_, ok := expr.(*ast.SelectorExpr)
-
-	return ok
-}
-
 func contains(slice []string, el string) bool {
 	for _, s := range slice {
 		if s == el {
@@ -177,6 +167,7 @@ func contains(slice []string, el string) bool {
 	return false
 }
 
+// isError returns whether or not the provided type interface is an error
 func isError(typ types.Type) bool {
 	if typ == nil {
 		return false
