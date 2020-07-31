@@ -7,7 +7,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-const errPkgName = "errors"
+const errorsPkgName = "errors"
 
 var Analyzer = &analysis.Analyzer{
 	Name: "wrapcheck",
@@ -17,12 +17,8 @@ var Analyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
-		// TODO store the last error as
-		var _ *ast.AssignStmt
-
 		ast.Inspect(file, func(n ast.Node) bool {
 			if _, ok := n.(*ast.AssignStmt); ok {
-				// TODO save the most recent error assignment
 				return true
 			}
 
@@ -36,39 +32,87 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			}
 
 			// Iterate over the values to be returned looking for errors
-			for _, res := range ret.Results {
-				if !isError(pass.TypesInfo.TypeOf(res)) {
+			for _, expr := range ret.Results {
+				if !isError(pass.TypesInfo.TypeOf(expr)) {
 					continue
 				}
 
-				ident, ok := res.(*ast.Ident)
+				ident, ok := expr.(*ast.Ident)
 				if !ok {
 					return true
+				}
+
+				returnPos := ident.Pos()
+
+				// This is the original declaration
+				sourceDecl := ident.Obj.Decl
+
+				// A slice containing all the assignments which contain an identifer
+				// referring to the source declaration of the error. This is to catch
+				// cases where err is defined once, and then reassigned multiple times
+				// within the same block. In these cases, we should check the method of
+				// the most recent call.
+				var assigns []*ast.AssignStmt
+
+				// Find all assignments which have the same declaration
+				ast.Inspect(file, func(n ast.Node) bool {
+					if ass, ok := n.(*ast.AssignStmt); ok {
+						for _, expr := range ass.Lhs {
+							if !isError(pass.TypesInfo.TypeOf(expr)) {
+								continue
+							}
+							if assIdent, ok := expr.(*ast.Ident); ok {
+								if assIdent.Obj.Decl == sourceDecl {
+									assigns = append(assigns, ass)
+								}
+							}
+						}
+					}
+
+					return true
+				})
+
+				// Iterate through the assignments, comparing the token positions to
+				// find the assignment that directly precedes the return position
+				var mostRecentAssign *ast.AssignStmt
+
+				for _, ass := range assigns {
+					if ass.Pos() > returnPos {
+						break
+					}
+					mostRecentAssign = ass
 				}
 
 				var (
 					call *ast.CallExpr
 				)
 
-				// Try to pull out an *ast.CallExpr from either a short assignment `:=`
-				// or a long assignment `var`/`const`
-				if ass, ok := ident.Obj.Decl.(*ast.AssignStmt); ok {
-					// first check for a short assignment
-					call, ok = ass.Rhs[0].(*ast.CallExpr)
-					if !ok {
-						return true
-					}
-				} else if vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
-					// check for a long assignment or const
-					if len(vSpec.Values) < 1 {
-						return true
-					}
-					call, ok = vSpec.Values[0].(*ast.CallExpr)
-					if !ok {
-						return true
+				// If the mostRecentAssign is nil, then we should check for ValueSpec
+				// nodes in order to locate a possible var declaration
+				if mostRecentAssign == nil {
+					if vSpec, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
+						// check for a long assignment or const
+						if len(vSpec.Values) < 1 {
+							return true
+						}
+						call, ok = vSpec.Values[0].(*ast.CallExpr)
+						if !ok {
+							return true
+						}
+					} else {
+						// We couldn't find a short or var assign for this error return.
+						// This is an error.
+						panic("error: no declaration for variable")
 					}
 				} else {
-					return true
+					// Try to pull out an *ast.CallExpr from either a short assignment `:=`
+					// or a long assignment `var`/`const`
+					// if ass, ok := mostRecentAssign.(*ast.AssignStmt); ok {
+					// first check for a short assignment
+					call, ok = mostRecentAssign.Rhs[0].(*ast.CallExpr)
+					if !ok {
+						return true
+					}
 				}
 
 				sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -84,7 +128,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				// make sure that it's an identifier from the same package
 				if pass.Pkg.Path() == funcPkg.Path() {
 					return true
-				} else if funcPkg.Name() == errPkgName {
+				} else if funcPkg.Name() == errorsPkgName {
 					// Ignore the error if it's returned by something in the "errors"
 					// package, e.g. errors.New(...)
 					return true
@@ -111,5 +155,9 @@ func isPackageCall(expr ast.Expr) bool {
 }
 
 func isError(typ types.Type) bool {
+	if typ == nil {
+		return false
+	}
+
 	return typ.String() == "error"
 }

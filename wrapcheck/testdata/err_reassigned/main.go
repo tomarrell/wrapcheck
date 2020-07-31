@@ -23,6 +23,18 @@ func do() error {
 		return err
 	}
 
+	// This should also not error, as it's a call into the errors pkg
+	err = errors.New("failed")
+	if err != nil {
+		return err
+	}
+
+	// This should error
+	_, err = json.Marshal(struct{}{})
+	if err != nil {
+		return err // want `error returned from external package is unwrapped`
+	}
+
 	return nil
 }
 
