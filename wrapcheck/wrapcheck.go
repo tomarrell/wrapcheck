@@ -125,26 +125,9 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 // isInterface returns whether the function call is one defined on an interface.
 func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr, ident *ast.Ident) bool {
-	xIdent, ok := sel.X.(*ast.Ident)
-	if !ok || xIdent.Obj == nil {
-		return false
-	}
+	_, ok := pass.TypesInfo.TypeOf(sel.X).Underlying().(*types.Interface)
 
-	xField, ok := xIdent.Obj.Decl.(*ast.Field)
-	if !ok {
-		return false
-	}
-
-	xNamed, ok := pass.TypesInfo.TypeOf(xField.Type).(*types.Named)
-	if !ok {
-		return false
-	}
-
-	if _, ok := xNamed.Underlying().(*types.Interface); ok {
-		return true
-	}
-
-	return false
+	return ok
 }
 
 func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, ident *ast.Ident) bool {
