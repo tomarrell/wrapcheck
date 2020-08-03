@@ -100,19 +100,20 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				// The package of the function that we are calling which returns the
-				// error
-				fn := pass.TypesInfo.ObjectOf(sel.Sel)
-
-				// If it's not a package name, then we should check the selector to
-				// make sure that it's an identifier from the same package
-				if pass.Pkg.Path() == fn.Pkg().Path() {
-					return true
-				} else if contains(ignoredIDs, fn.String()) {
+				// Check if the underlying type of the "x" in x.y.z is an interface, as
+				// errors returned from interface types should be wrapped.
+				if isInterface(pass, sel, ident) {
+					pass.Reportf(ident.NamePos, "error returned from interface method should be wrapped")
 					return true
 				}
 
-				pass.Reportf(ident.NamePos, "error returned from external package is unwrapped")
+				// Check whether the function being called comes from another package,
+				// as functions called across package boundaries which returns errors
+				// should be wrapped
+				if isFromOtherPkg(pass, sel, ident) {
+					pass.Reportf(ident.NamePos, "error returned from external package is unwrapped")
+					return true
+				}
 			}
 
 			return true
@@ -120,6 +121,45 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+// isInterface returns whether the function call is one defined on an interface.
+func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr, ident *ast.Ident) bool {
+	xIdent, ok := sel.X.(*ast.Ident)
+	if !ok || xIdent.Obj == nil {
+		return false
+	}
+
+	xField, ok := xIdent.Obj.Decl.(*ast.Field)
+	if !ok {
+		return false
+	}
+
+	xNamed, ok := pass.TypesInfo.TypeOf(xField.Type).(*types.Named)
+	if !ok {
+		return false
+	}
+
+	if _, ok := xNamed.Underlying().(*types.Interface); ok {
+		return true
+	}
+
+	return false
+}
+
+func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, ident *ast.Ident) bool {
+	// The package of the function that we are calling which returns the error
+	fn := pass.TypesInfo.ObjectOf(sel.Sel)
+
+	// If it's not a package name, then we should check the selector to make sure
+	// that it's an identifier from the same package
+	if pass.Pkg.Path() == fn.Pkg().Path() {
+		return false
+	} else if contains(ignoredIDs, fn.String()) {
+		return false
+	}
+
+	return true
 }
 
 // prevErrAssign traverses the AST of a file looking for the most recent
