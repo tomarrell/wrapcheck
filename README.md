@@ -17,6 +17,84 @@ To lint all the packages in a program:
 $ wrapcheck ./...
 ```
 
+## TLDR
+
+If you've ever been debugging your Go program, and you've seen an error like
+this pop up in your logs.
+
+```log
+time="2020-08-04T11:36:27+02:00" level=error error="sql: error no rows"
+```
+
+Then you know exactly how painful it can be to hunt down the cause when you have
+many methods which looks just like the following:
+
+```go
+func (db *DB) getUserByID(userID string) (User, error) {
+	sql := `SELECT * FROM user WHERE id = $1;`
+
+	var u User
+	if err := db.conn.Get(&u, sql, userID); err != nil {
+		return User{}, err // wrapcheck error: error returned from external package is unwrapped
+	}
+
+	return u, nil
+}
+
+func (db *DB) getItemByID(itemID string) (Item, error) {
+	sql := `SELECT * FROM item WHERE id = $1;`
+
+	var i Item
+	if err := db.conn.Get(&i, sql, itemID); err != nil {
+		return Item{}, err // wrapcheck error: error returned from external package is unwrapped
+	}
+
+	return i, nil
+}
+```
+
+The problem here is that multiple method calls into the `sql` package can return
+the same error. Therefore, it helps to establish a trace point at the point
+where error handing across package boundaries occurs.
+
+To resolve this, simply wrap the error returned by the `db.Conn.Get()` call.
+
+```go
+func (db *DB) getUserByID(userID string) (User, error) {
+	sql := `SELECT * FROM user WHERE id = $1;`
+
+	var u User
+	if err := db.Conn.Get(&u, sql, userID); err != nil {
+		return User{}, fmt.Errorf("failed to get user by ID: %v", err) // No error!
+	}
+
+	return u, nil
+}
+
+func (db *DB) getItemByID(itemID string) (Item, error) {
+	sql := `SELECT * FROM item WHERE id = $1;`
+
+	var i Item
+	if err := db.Conn.Get(&i, sql, itemID); err != nil {
+		return Item{}, fmt.Errof("failed to get item by ID: %v", err) // No error!
+	}
+
+	return i, nil
+}
+```
+
+Now, your logs will be more descriptive, and allow you to easily locate the
+source of your errors.
+
+```log
+time="2020-08-04T11:36:27+02:00" level=error error="failed to get user by ID: sql: error no rows"
+```
+
+A further step would be to enforce adding stack traces to your errors instead
+using
+[`errors.WithStack()`](https://pkg.go.dev/github.com/pkg/errors?tab=doc#WithStack)
+however, enforcing this is out of scope for this linter for now.
+
 ## Why?
 
 Errors in Go are simple values. They contain no more information about than the
@@ -74,4 +152,15 @@ func (db *DB) createUser(name, email, city string) error {
 
 This solution allows you to add context which will be handed to the caller,
 making identifying the source easier during debugging.
+
+## Contributing
+
+As with most static analysis tools, this linter will likely miss some obscure
+cases. If you come across a case which you think should be covered and isn't,
+please file an issue including a minimum reproducible example of the case.
+
+## License
+
+This project is licensed under the MIT license. See the [LICENSE](./LICENSE) file for more
+details.
 
