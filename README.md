@@ -6,7 +6,7 @@ during return to help identify the error source during debugging.
 ## Install
 
 ```bash
-$ go get github.com/tomarrell/wrapcheck/cmd/wrapcheck
+$ go get -u github.com/tomarrell/wrapcheck/cmd/wrapcheck
 ```
 
 ## Usage
