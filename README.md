@@ -1,5 +1,7 @@
 # Wrapcheck
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/tomarrell/wrapcheck)](https://goreportcard.com/report/github.com/tomarrell/wrapcheck)
+
 A simple Go linter to check that errors from external packages are wrapped
 during return to help identify the error source during debugging.
 
