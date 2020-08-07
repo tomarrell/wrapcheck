@@ -17,6 +17,10 @@ To lint all the packages in a program:
 $ wrapcheck ./...
 ```
 
+## Testing
+
+This linter is tested using `analysistest`, you can view all the test cases under the [testdata](./wrapcheck/testdata) directory.
+
 ## TLDR
 
 If you've ever been debugging your Go program, and you've seen an error like
