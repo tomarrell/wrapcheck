@@ -5,6 +5,8 @@
 A simple Go linter to check that errors from external packages are wrapped
 during return to help identify the error source during debugging.
 
+> More detail in [this article](https://blog.tomarrell.com/post/introducing_wrapcheck_linter_for_go)
+
 ## Install
 
 ```bash
