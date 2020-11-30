@@ -84,7 +84,7 @@ func (db *DB) getItemByID(itemID string) (Item, error) {
 
 	var i Item
 	if err := db.Conn.Get(&i, sql, itemID); err != nil {
-		return Item{}, fmt.Errof("failed to get item by ID: %v", err) // No error!
+		return Item{}, fmt.Errorf("failed to get item by ID: %v", err) // No error!
 	}
 
 	return i, nil
