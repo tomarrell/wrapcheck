@@ -1,7 +1,11 @@
 # Wrapcheck
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/tomarrell/wrapcheck)](https://goreportcard.com/report/github.com/tomarrell/wrapcheck)
+
 A simple Go linter to check that errors from external packages are wrapped
 during return to help identify the error source during debugging.
+
+> More detail in [this article](https://blog.tomarrell.com/post/introducing_wrapcheck_linter_for_go)
 
 ## Install
 
@@ -16,6 +20,10 @@ To lint all the packages in a program:
 ```bash
 $ wrapcheck ./...
 ```
+
+## Testing
+
+This linter is tested using `analysistest`, you can view all the test cases under the [testdata](./wrapcheck/testdata) directory.
 
 ## TLDR
 
@@ -76,7 +84,7 @@ func (db *DB) getItemByID(itemID string) (Item, error) {
 
 	var i Item
 	if err := db.Conn.Get(&i, sql, itemID); err != nil {
-		return Item{}, fmt.Errof("failed to get item by ID: %v", err) // No error!
+		return Item{}, fmt.Errorf("failed to get item by ID: %v", err) // No error!
 	}
 
 	return i, nil
