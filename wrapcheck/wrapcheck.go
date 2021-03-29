@@ -4,14 +4,18 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 )
 
-var ignoredIDs = []string{
-	"func fmt.Errorf(format string, a ...interface{}) error",
-	"func errors.New(text string) error",
-	"func errors.Unwrap(err error) error",
+var ignoredSigs = []string{
+	"fmt.Errorf(",
+	"errors.New(",
+	"errors.Unwrap(",
+	".Wrap(",
+	".Wrapf(",
+	".WithMessage(",
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -177,7 +181,7 @@ func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 	// that it's an identifier from the same package
 	if pass.Pkg.Path() == fn.Pkg().Path() {
 		return false
-	} else if contains(ignoredIDs, fn.String()) {
+	} else if contains(ignoredSigs, fn.String()) {
 		return false
 	}
 
@@ -237,7 +241,7 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 
 func contains(slice []string, el string) bool {
 	for _, s := range slice {
-		if s == el {
+		if strings.Contains(el, s) {
 			return true
 		}
 	}
