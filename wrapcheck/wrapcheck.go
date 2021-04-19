@@ -10,7 +10,7 @@ import (
 )
 
 var ignoredSigs = []string{
-	"fmt.Errorf(",
+	".Error",
 	"errors.New(",
 	"errors.Unwrap(",
 	".Wrap(",
