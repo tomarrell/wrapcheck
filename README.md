@@ -14,6 +14,11 @@ Go `>= v1.16`
 $ go install github.com/tomarrell/wrapcheck/v2/cmd/wrapcheck@v2
 ```
 
+Wrapcheck is also available as part of the golangci-lint meta linter. Docs and
+usage instructions are available
+[here](https://github.com/golangci/golangci-lint). When used with golangci-lint,
+configuration is integrated with the `.golangci.yaml` file.
+
 ## Configuration
 
 You can configure wrapcheck by using a `.wrapcheck.yaml` file in either the
