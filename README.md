@@ -21,7 +21,7 @@ local directory, or in your home directory.
 ```yaml
 # An array of strings which specify substrings of signatures to ignore. If this
 # set, it will override the default set of ignored signatures. You can find the
-# default set at the top of [./wrapcheck/wrapcheck.go](./wrapcheck/wrapcheck.go).
+# default set at the top of ./wrapcheck/wrapcheck.go.
 ignoreSigs:
 - fmt.Errorf(
 - errors.New(
