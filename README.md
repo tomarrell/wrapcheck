@@ -11,7 +11,7 @@ during return to help identify the error source during debugging.
 
 Go `>= v1.16`
 ```bash
-$ go install github.com/tomarrell/wrapcheck/cmd/wrapcheck@v2
+$ go install github.com/tomarrell/wrapcheck/v2/cmd/wrapcheck@v2
 ```
 
 ## Configuration
