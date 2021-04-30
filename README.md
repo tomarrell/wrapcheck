@@ -9,6 +9,13 @@ during return to help identify the error source during debugging.
 
 ## Install
 
+Go `>= v1.16`
+```bash
+$ go install github.com/tomarrell/wrapcheck/cmd/wrapcheck@v2
+```
+
+Go `<= v1.16`
+
 ```bash
 $ go get -u github.com/tomarrell/wrapcheck/cmd/wrapcheck
 ```
