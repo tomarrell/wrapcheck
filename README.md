@@ -13,6 +13,17 @@ during return to help identify the error source during debugging.
 $ go get -u github.com/tomarrell/wrapcheck/cmd/wrapcheck
 ```
 
+## Configuration
+
+You can configure wrapcheck by using a `.wrapcheck.yaml` file in either the
+local directory, or in your home directory.
+
+```yaml
+ignoreSigs: # An array of strings which specify substrings of signatures to ignore.
+- fmt.Errorf(
+- errors.New(
+```
+
 ## Usage
 
 To lint all the packages in a program:
@@ -23,7 +34,8 @@ $ wrapcheck ./...
 
 ## Testing
 
-This linter is tested using `analysistest`, you can view all the test cases under the [testdata](./wrapcheck/testdata) directory.
+This linter is tested using `analysistest`, you can view all the test cases
+under the [testdata](./wrapcheck/testdata) directory.
 
 ## TLDR
 
