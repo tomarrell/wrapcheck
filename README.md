@@ -23,8 +23,12 @@ local directory, or in your home directory.
 # set, it will override the default set of ignored signatures. You can find the
 # default set at the top of ./wrapcheck/wrapcheck.go.
 ignoreSigs:
-- fmt.Errorf(
+- .Errorf(
 - errors.New(
+- errors.Unwrap(
+- .Wrap(
+- .Wrapf(
+- .WithMessage(
 ```
 
 ## Usage
