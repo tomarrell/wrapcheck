@@ -19,7 +19,10 @@ You can configure wrapcheck by using a `.wrapcheck.yaml` file in either the
 local directory, or in your home directory.
 
 ```yaml
-ignoreSigs: # An array of strings which specify substrings of signatures to ignore.
+# An array of strings which specify substrings of signatures to ignore. If this
+# set, it will override the default set of ignored signatures. You can find the
+# default set at the top of [./wrapcheck/wrapcheck.go](./wrapcheck/wrapcheck.go).
+ignoreSigs:
 - fmt.Errorf(
 - errors.New(
 ```
