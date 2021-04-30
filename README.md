@@ -14,12 +14,6 @@ Go `>= v1.16`
 $ go install github.com/tomarrell/wrapcheck/cmd/wrapcheck@v2
 ```
 
-Go `<= v1.16`
-
-```bash
-$ go get -u github.com/tomarrell/wrapcheck/cmd/wrapcheck
-```
-
 ## Configuration
 
 You can configure wrapcheck by using a `.wrapcheck.yaml` file in either the
