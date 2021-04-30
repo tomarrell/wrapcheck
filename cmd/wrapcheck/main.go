@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/spf13/viper"
-	"github.com/tomarrell/wrapcheck/wrapcheck"
+	"github.com/tomarrell/wrapcheck/v2/wrapcheck"
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 

@@ -1,4 +1,4 @@
-module github.com/tomarrell/wrapcheck
+module github.com/tomarrell/wrapcheck/v2
 
 go 1.14
 
