@@ -26,7 +26,7 @@ func TestAnalyzer(t *testing.T) {
 
 			p, err := filepath.Abs(path.Join("./testdata", f.Name()))
 			assert.NoError(t, err)
-			analysistest.Run(t, p, Analyzer)
+			analysistest.Run(t, p, NewAnalyzer(NewDefaultConfig()))
 		})
 	}
 
