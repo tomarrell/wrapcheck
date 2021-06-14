@@ -24,5 +24,13 @@ func do() error {
 		return errors.WithMessage(err, "uh oh")
 	}
 
-	return nil
+	if err != nil {
+		return errors.WithMessagef(err, "uh %s", "oh")
+	}
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return errors.New("uh oh")
 }

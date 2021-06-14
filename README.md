@@ -35,6 +35,8 @@ ignoreSigs:
 - .Wrap(
 - .Wrapf(
 - .WithMessage(
+- .WithMessagef(
+- .WithStack(
 ```
 
 ## Usage
