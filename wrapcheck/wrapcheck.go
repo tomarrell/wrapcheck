@@ -16,6 +16,8 @@ var DefaultIgnoreSigs = []string{
 	".Wrap(",
 	".Wrapf(",
 	".WithMessage(",
+	".WithMessagef(",
+	".WithStack(",
 }
 
 // WrapcheckConfig is the set of configuration values which configure the
