@@ -38,7 +38,7 @@ type WrapcheckConfig struct {
 	// Note: Setting this value will intentionally override the default ignored
 	// sigs. To achieve the same behaviour as default, you should add the default
 	// list to your config.
-	IgnoreSigs []string `mapstructure:"ignoreSigs"`
+	IgnoreSigs []string `mapstructure:"ignoreSigs" yaml:"ignoreSigs"`
 }
 
 func NewDefaultConfig() WrapcheckConfig {

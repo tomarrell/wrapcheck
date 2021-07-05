@@ -2,12 +2,14 @@ package wrapcheck
 
 import (
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/tools/go/analysis/analysistest"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAnalyzer(t *testing.T) {
@@ -24,10 +26,21 @@ func TestAnalyzer(t *testing.T) {
 				t.Fatalf("cannot run on non-directory: %s", f.Name())
 			}
 
-			p, err := filepath.Abs(path.Join("./testdata", f.Name()))
+			dirPath, err := filepath.Abs(path.Join("./testdata", f.Name()))
 			assert.NoError(t, err)
-			analysistest.Run(t, p, NewAnalyzer(NewDefaultConfig()))
+
+			configPath := path.Join(dirPath, ".wrapcheck.yaml")
+			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+				analysistest.Run(t, dirPath, NewAnalyzer(NewDefaultConfig()))
+			} else {
+				configFile, err := os.ReadFile(configPath)
+				assert.NoError(t, err)
+
+				var config WrapcheckConfig
+				assert.NoError(t, yaml.Unmarshal(configFile, &config))
+
+				analysistest.Run(t, dirPath, NewAnalyzer(config))
+			}
 		})
 	}
-
 }
