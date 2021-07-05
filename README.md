@@ -37,6 +37,14 @@ ignoreSigs:
 - .WithMessage(
 - .WithMessagef(
 - .WithStack(
+
+# An array of glob patterns which, if any match the package of the function
+# returning the error, will skip wrapcheck analysis for this error. This is
+# useful for broadly ignoring packages and/or subpackages from wrapcheck
+# analysis. There are no defaults for this value.
+ignorePackageGlobs:
+- encoding/*
+- github.com/pkg/*
 ```
 
 ## Usage

@@ -31,8 +31,10 @@ func TestAnalyzer(t *testing.T) {
 
 			configPath := path.Join(dirPath, ".wrapcheck.yaml")
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+				// There is no config
 				analysistest.Run(t, dirPath, NewAnalyzer(NewDefaultConfig()))
-			} else {
+			} else if err == nil {
+				// A config file exists, use it
 				configFile, err := os.ReadFile(configPath)
 				assert.NoError(t, err)
 
@@ -40,6 +42,8 @@ func TestAnalyzer(t *testing.T) {
 				assert.NoError(t, yaml.Unmarshal(configFile, &config))
 
 				analysistest.Run(t, dirPath, NewAnalyzer(config))
+			} else {
+				assert.FailNow(t, err.Error())
 			}
 		})
 	}
