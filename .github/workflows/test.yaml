@@ -2,7 +2,7 @@ on:
   push:
     branches: [master]
   pull_request: {}
-name: Test
+name: Tests
 jobs:
   test:
     runs-on: ubuntu-latest
