@@ -39,7 +39,7 @@ ignoreSigs:
 - .WithMessagef(
 - .WithStack(
 
-# An array of string which specify regular expressions of signatures to ignore.
+# An array of strings which specify regular expressions of signatures to ignore.
 # This is similar to the ignoreSigs configuration above, but gives slightly more
 # flexibility.
 ignoreSigRegexps:
