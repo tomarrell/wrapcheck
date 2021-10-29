@@ -39,6 +39,12 @@ ignoreSigs:
 - .WithMessagef(
 - .WithStack(
 
+# An array of strings which specify regular expressions of signatures to ignore.
+# This is similar to the ignoreSigs configuration above, but gives slightly more
+# flexibility.
+ignoreSigRegexps:
+- \.New.*Error\(
+
 # An array of glob patterns which, if any match the package of the function
 # returning the error, will skip wrapcheck analysis for this error. This is
 # useful for broadly ignoring packages and/or subpackages from wrapcheck
