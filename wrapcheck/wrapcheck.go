@@ -94,10 +94,6 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	return func(pass *analysis.Pass) (interface{}, error) {
 		for _, file := range pass.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
-				if _, ok := n.(*ast.AssignStmt); ok {
-					return true
-				}
-
 				ret, ok := n.(*ast.ReturnStmt)
 				if !ok {
 					return true
