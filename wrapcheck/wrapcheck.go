@@ -1,3 +1,6 @@
+// Package wrapcheck defines a new static analyzer which will report errors
+// which are returned across package and interface boundaries and subsequently
+// returned without being wrapped.
 package wrapcheck
 
 import (
@@ -74,6 +77,9 @@ type WrapcheckConfig struct {
 	IgnorePackageGlobs []string `mapstructure:"ignorePackageGlobs" yaml:"ignorePackageGlobs"`
 }
 
+// NewDNewDefaultConfig initialises a config containing the default ignore
+// rules, specifically patterns for standard library wrapping as well as the
+// common pkg/errors functions.
 func NewDefaultConfig() WrapcheckConfig {
 	return WrapcheckConfig{
 		IgnoreSigs:         DefaultIgnoreSigs,
@@ -82,6 +88,7 @@ func NewDefaultConfig() WrapcheckConfig {
 	}
 }
 
+// NewNewAnalyzer creates a new instance of the wrapcheck analyzer.
 func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "wrapcheck",
