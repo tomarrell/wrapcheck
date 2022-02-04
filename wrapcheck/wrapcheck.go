@@ -71,9 +71,6 @@ type WrapcheckConfig struct {
 	// ignorePackageGlobs:
 	// - encoding/*
 	IgnorePackageGlobs []string `mapstructure:"ignorePackageGlobs" yaml:"ignorePackageGlobs"`
-
-	// ignoreSigRegexpCompiled use to hold compiled results of the IgnoreSigRegexps
-	ignoreSigRegexpCompiled []*regexp.Regexp
 }
 
 func NewDefaultConfig() WrapcheckConfig {
@@ -93,22 +90,24 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 }
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
-	var Err error
+	var (
+		regexpErr       error
+		ignoreSigRegexp []*regexp.Regexp
+	)
 
 	for i := range cfg.IgnoreSigRegexps {
 		re, err := regexp.Compile(cfg.IgnoreSigRegexps[i])
 		if err != nil {
-			Err = fmt.Errorf("unable to parse regexp: %v at %s\n", err, cfg.IgnoreSigRegexps[i])
-			log.Printf(Err.Error())
+			regexpErr = fmt.Errorf("unable to parse regexp: %v at %s\n", err, cfg.IgnoreSigRegexps[i])
+			log.Printf(regexpErr.Error())
 			break
 		}
-		cfg.ignoreSigRegexpCompiled = append(cfg.ignoreSigRegexpCompiled, re)
+		ignoreSigRegexp = append(ignoreSigRegexp, re)
 	}
 
 	return func(pass *analysis.Pass) (interface{}, error) {
-		// handling load errors.
-		if Err != nil {
-			return nil, Err
+		if regexpErr != nil {
+			return nil, regexpErr
 		}
 
 		for _, file := range pass.Files {
@@ -133,7 +132,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						// tuple check is required.
 
 						if isError(pass.TypesInfo.TypeOf(expr)) {
-							reportUnwrapped(pass, retFn, retFn.Pos(), cfg)
+							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp)
 							return true
 						}
 
@@ -151,7 +150,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 								return true
 							}
 							if isError(v.Type()) {
-								reportUnwrapped(pass, retFn, expr.Pos(), cfg)
+								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp)
 								return true
 							}
 						}
@@ -213,7 +212,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						return true
 					}
 
-					reportUnwrapped(pass, call, ident.NamePos, cfg)
+					reportUnwrapped(pass, call, ident.NamePos, cfg, ignoreSigRegexp)
 				}
 
 				return true
@@ -226,7 +225,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 
 // Report unwrapped takes a call expression and an identifier and reports
 // if the call is unwrapped.
-func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig) {
+func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexps []*regexp.Regexp) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
@@ -237,7 +236,7 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 
 	if contains(cfg.IgnoreSigs, fnSig) {
 		return
-	} else if containsMatch(cfg.ignoreSigRegexpCompiled, fnSig) {
+	} else if containsMatch(regexps, fnSig) {
 		return
 	}
 
