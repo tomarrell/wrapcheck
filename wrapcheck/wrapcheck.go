@@ -1,6 +1,7 @@
 package wrapcheck
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -13,18 +14,16 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-var (
-	DefaultIgnoreSigs = []string{
-		".Errorf(",
-		"errors.New(",
-		"errors.Unwrap(",
-		".Wrap(",
-		".Wrapf(",
-		".WithMessage(",
-		".WithMessagef(",
-		".WithStack(",
-	}
-)
+var DefaultIgnoreSigs = []string{
+	".Errorf(",
+	"errors.New(",
+	"errors.Unwrap(",
+	".Wrap(",
+	".Wrapf(",
+	".WithMessage(",
+	".WithMessagef(",
+	".WithStack(",
+}
 
 // WrapcheckConfig is the set of configuration values which configure the
 // behaviour of the linter.
@@ -72,6 +71,9 @@ type WrapcheckConfig struct {
 	// ignorePackageGlobs:
 	// - encoding/*
 	IgnorePackageGlobs []string `mapstructure:"ignorePackageGlobs" yaml:"ignorePackageGlobs"`
+
+	// ignoreSigRegexpCompiled use to hold compiled results of the IgnoreSigRegexps
+	ignoreSigRegexpCompiled []*regexp.Regexp
 }
 
 func NewDefaultConfig() WrapcheckConfig {
@@ -91,7 +93,24 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 }
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
+	var Err error
+
+	for i := range cfg.IgnoreSigRegexps {
+		re, err := regexp.Compile(cfg.IgnoreSigRegexps[i])
+		if err != nil {
+			Err = fmt.Errorf("unable to parse regexp: %v at %s\n", err, cfg.IgnoreSigRegexps[i])
+			log.Printf(Err.Error())
+			break
+		}
+		cfg.ignoreSigRegexpCompiled = append(cfg.ignoreSigRegexpCompiled, re)
+	}
+
 	return func(pass *analysis.Pass) (interface{}, error) {
+		// handling load errors.
+		if Err != nil {
+			return nil, Err
+		}
+
 		for _, file := range pass.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
 				ret, ok := n.(*ast.ReturnStmt)
@@ -112,6 +131,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						// If the return type of the function is a single error. This will not
 						// match an error within multiple return values, for that, the below
 						// tuple check is required.
+
 						if isError(pass.TypesInfo.TypeOf(expr)) {
 							reportUnwrapped(pass, retFn, retFn.Pos(), cfg)
 							return true
@@ -146,9 +166,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						return true
 					}
 
-					var (
-						call *ast.CallExpr
-					)
+					var call *ast.CallExpr
 
 					// Attempt to find the most recent short assign
 					if shortAss := prevErrAssign(pass, file, ident); shortAss != nil {
@@ -216,9 +234,10 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 
 	// Check for ignored signatures
 	fnSig := pass.TypesInfo.ObjectOf(sel.Sel).String()
+
 	if contains(cfg.IgnoreSigs, fnSig) {
 		return
-	} else if containsMatch(cfg.IgnoreSigRegexps, fnSig) {
+	} else if containsMatch(cfg.ignoreSigRegexpCompiled, fnSig) {
 		return
 	}
 
@@ -331,14 +350,8 @@ func contains(slice []string, el string) bool {
 	return false
 }
 
-func containsMatch(slice []string, el string) bool {
-	for _, s := range slice {
-		re, err := regexp.Compile(s)
-		if err != nil {
-			log.Printf("unable to parse regexp: %s\n", s)
-			os.Exit(1)
-		}
-
+func containsMatch(regexps []*regexp.Regexp, el string) bool {
+	for _, re := range regexps {
 		if re.MatchString(el) {
 			return true
 		}
