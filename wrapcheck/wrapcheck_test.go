@@ -26,6 +26,10 @@ func TestAnalyzer(t *testing.T) {
 				t.Fatalf("cannot run on non-directory: %s", f.Name())
 			}
 
+			if f.Name() == "config_ignoreSigRegexps_fail" {
+				t.Skipf("skipping %s, as it expect to fail in this test", f.Name())
+			}
+
 			dirPath, err := filepath.Abs(path.Join("./testdata", f.Name()))
 			assert.NoError(t, err)
 
@@ -40,11 +44,26 @@ func TestAnalyzer(t *testing.T) {
 
 				var config WrapcheckConfig
 				assert.NoError(t, yaml.Unmarshal(configFile, &config))
-
 				analysistest.Run(t, dirPath, NewAnalyzer(config))
+
 			} else {
 				assert.FailNow(t, err.Error())
 			}
 		})
 	}
+}
+
+func TestFail(t *testing.T) {
+	// A config file exists, use it
+	configFile, err := os.ReadFile("./testdata/config_ignoreSigRegexps_fail/.wrapcheck.yaml")
+	assert.NoError(t, err)
+
+	var config WrapcheckConfig
+	assert.NoError(t, yaml.Unmarshal(configFile, &config))
+	a := NewAnalyzer(config)
+	results, err := a.Run(nil) // doesn't matter what we passing ...
+
+	assert.Nil(t, results)
+	assert.EqualError(t, err,
+		"unable to parse regexp: error parsing regexp: missing closing ]: `[a-zA-Z0-9_-` at json\\.[a-zA-Z0-9_-\n")
 }
