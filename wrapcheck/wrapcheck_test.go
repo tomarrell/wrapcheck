@@ -12,6 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// A file present in the directory named "analysis_skip" will cause the primary
+// analysis tests to skip this directory due to needing explicit tests.
+const skipfile = "analysistest_skip"
+
 func TestAnalyzer(t *testing.T) {
 	// Load the dirs under ./testdata
 	p, err := filepath.Abs("./testdata")
@@ -26,12 +30,14 @@ func TestAnalyzer(t *testing.T) {
 				t.Fatalf("cannot run on non-directory: %s", f.Name())
 			}
 
-			if f.Name() == "config_ignoreSigRegexps_fail" {
-				t.Skipf("skipping %s, as it expect to fail in this test", f.Name())
-			}
-
 			dirPath, err := filepath.Abs(path.Join("./testdata", f.Name()))
 			assert.NoError(t, err)
+
+			// Check if the test is marked for skipping analysistest
+			if _, err := os.Stat(path.Join(dirPath, skipfile)); err == nil {
+				t.Logf("skipping test: %s\n", t.Name())
+				t.Skip()
+			}
 
 			configPath := path.Join(dirPath, ".wrapcheck.yaml")
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -45,7 +51,6 @@ func TestAnalyzer(t *testing.T) {
 				var config WrapcheckConfig
 				assert.NoError(t, yaml.Unmarshal(configFile, &config))
 				analysistest.Run(t, dirPath, NewAnalyzer(config))
-
 			} else {
 				assert.FailNow(t, err.Error())
 			}
@@ -53,7 +58,7 @@ func TestAnalyzer(t *testing.T) {
 	}
 }
 
-func TestFail(t *testing.T) {
+func TestRegexpCompileFail(t *testing.T) {
 	// A config file exists, use it
 	configFile, err := os.ReadFile("./testdata/config_ignoreSigRegexps_fail/.wrapcheck.yaml")
 	assert.NoError(t, err)
@@ -61,9 +66,8 @@ func TestFail(t *testing.T) {
 	var config WrapcheckConfig
 	assert.NoError(t, yaml.Unmarshal(configFile, &config))
 	a := NewAnalyzer(config)
-	results, err := a.Run(nil) // doesn't matter what we passing ...
+	results, err := a.Run(nil) // Doesn't matter what we pass
 
 	assert.Nil(t, results)
-	assert.EqualError(t, err,
-		"unable to parse regexp: error parsing regexp: missing closing ]: `[a-zA-Z0-9_-` at json\\.[a-zA-Z0-9_-\n")
+	assert.Contains(t, err.Error(), "unable to parse regexp json\\.[a-zA-Z0-9_-")
 }

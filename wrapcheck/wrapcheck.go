@@ -90,24 +90,12 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 }
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
-	var (
-		regexpErr       error
-		ignoreSigRegexp []*regexp.Regexp
-	)
-
-	for i := range cfg.IgnoreSigRegexps {
-		re, err := regexp.Compile(cfg.IgnoreSigRegexps[i])
-		if err != nil {
-			regexpErr = fmt.Errorf("unable to parse regexp: %v at %s\n", err, cfg.IgnoreSigRegexps[i])
-			log.Printf(regexpErr.Error())
-			break
-		}
-		ignoreSigRegexp = append(ignoreSigRegexp, re)
-	}
+	// Precompile the regexps, report the error
+	ignoreSigRegexp, err := compileRegexps(cfg.IgnoreSigRegexps)
 
 	return func(pass *analysis.Pass) (interface{}, error) {
-		if regexpErr != nil {
-			return nil, regexpErr
+		if err != nil {
+			return nil, err
 		}
 
 		for _, file := range pass.Files {
@@ -263,6 +251,9 @@ func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 	return ok
 }
 
+// isFromotherPkg returns whether the function is defined in the pacakge
+// currently under analysis or is considered external. It will ignore packages
+// defined in config.IgnorePackageGlobs.
 func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, config WrapcheckConfig) bool {
 	// The package of the function that we are calling which returns the error
 	fn := pass.TypesInfo.ObjectOf(sel.Sel)
@@ -376,4 +367,20 @@ func isUnresolved(file *ast.File, ident *ast.Ident) bool {
 	}
 
 	return false
+}
+
+// compileRegexps compiles a set of regular expressions returning them for use,
+// or the first encountered error due to an invalid expression.
+func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
+	var compiledRegexps []*regexp.Regexp
+	for _, reg := range regexps {
+		re, err := regexp.Compile(reg)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse regexp %s: %v\n", reg, err)
+		}
+
+		compiledRegexps = append(compiledRegexps, re)
+	}
+
+	return compiledRegexps, nil
 }
