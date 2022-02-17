@@ -59,15 +59,15 @@ func TestAnalyzer(t *testing.T) {
 }
 
 func TestRegexpCompileFail(t *testing.T) {
-	// A config file exists, use it
 	configFile, err := os.ReadFile("./testdata/config_ignoreSigRegexps_fail/.wrapcheck.yaml")
 	assert.NoError(t, err)
 
 	var config WrapcheckConfig
 	assert.NoError(t, yaml.Unmarshal(configFile, &config))
-	a := NewAnalyzer(config)
-	results, err := a.Run(nil) // Doesn't matter what we pass
 
+	a := NewAnalyzer(config)
+
+	results, err := a.Run(nil) // Doesn't matter what we pass
 	assert.Nil(t, results)
-	assert.Contains(t, err.Error(), "unable to parse regexp json\\.[a-zA-Z0-9_-")
+	assert.Contains(t, err.Error(), "unable to compile regexp json\\.[a-zA-Z0-9_-")
 }

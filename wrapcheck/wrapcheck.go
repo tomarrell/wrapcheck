@@ -376,7 +376,7 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 	for _, reg := range regexps {
 		re, err := regexp.Compile(reg)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse regexp %s: %v\n", reg, err)
+			return nil, fmt.Errorf("unable to compile regexp %s: %v\n", reg, err)
 		}
 
 		compiledRegexps = append(compiledRegexps, re)
