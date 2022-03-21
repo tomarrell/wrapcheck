@@ -51,11 +51,11 @@ type WrapcheckConfig struct {
 	// unwrapped.
 	//
 	// For example, an ignoreSigRegexp of `[]string{"\.New.*Err\("}`` will ignore errors
-	// returned from any signture whose method name starts with "New" and ends with "Err"
+	// returned from any signature whose method name starts with "New" and ends with "Err"
 	// due to the signature matching the regular expression `\.New.*Err\(`.
 	//
 	// Note that this is similar to the ignoreSigs configuration, but provides
-	// slightly more flexibility in defining rules by which signtures will be
+	// slightly more flexibility in defining rules by which signatures will be
 	// ignored.
 	IgnoreSigRegexps []string `mapstructure:"ignoreSigRegexps" yaml:"ignoreSigRegexps"`
 
@@ -264,15 +264,11 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 // isInterface returns whether the function call is one defined on an interface.
 func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 	_, ok := pass.TypesInfo.TypeOf(sel.X).Underlying().(*types.Interface)
-	if ok {
-		fmt.Println(types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string {
-			return p.Name()
-		}))
-	}
+
 	return ok
 }
 
-// isFromotherPkg returns whether the function is defined in the pacakge
+// isFromotherPkg returns whether the function is defined in the package
 // currently under analysis or is considered external. It will ignore packages
 // defined in config.IgnorePackageGlobs.
 func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, config WrapcheckConfig) bool {

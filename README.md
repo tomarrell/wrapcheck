@@ -52,6 +52,13 @@ ignoreSigRegexps:
 ignorePackageGlobs:
 - encoding/*
 - github.com/pkg/*
+
+# An array of strings which specify regular expressions of interface names.
+# If matched will skip wrapcheck analysis for errors returned from a
+# function whose call is defined on the given interfaces. Allows to explicitly 
+# define interface names with mandated methods to ignore 
+ignoreInterfaceRegexps:
+- ^(?i)c(?-i)ach(ing|e)
 ```
 
 ## Usage
