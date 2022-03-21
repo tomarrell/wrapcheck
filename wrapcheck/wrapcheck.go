@@ -71,13 +71,23 @@ type WrapcheckConfig struct {
 	// ignorePackageGlobs:
 	// - encoding/*
 	IgnorePackageGlobs []string `mapstructure:"ignorePackageGlobs" yaml:"ignorePackageGlobs"`
+
+	// IgnoreInterfaceRegexps defines a list of regular expressions which, if matched
+	// to a underlying interface name, will ignore unwrapped errors returned from a
+	// function whose call is defined on the given interface.
+	//
+	// For example, an ignoreInterfaceRegexps of `[]string{"Transac(tor|tion)"}`` will ignore errors
+	// returned from any function whose call is defined on a interface named 'Transactor'
+	// or 'Transaction' due to the name matching the regular expression `Transac(tor|tion)`.
+	IgnoreInterfaceRegexps []string `mapstructure:"ignoreInterfaceRegexps" yaml:"ignoreInterfaceRegexps"`
 }
 
 func NewDefaultConfig() WrapcheckConfig {
 	return WrapcheckConfig{
-		IgnoreSigs:         DefaultIgnoreSigs,
-		IgnoreSigRegexps:   []string{},
-		IgnorePackageGlobs: []string{},
+		IgnoreSigs:             DefaultIgnoreSigs,
+		IgnoreSigRegexps:       []string{},
+		IgnorePackageGlobs:     []string{},
+		IgnoreInterfaceRegexps: []string{},
 	}
 }
 
@@ -91,11 +101,15 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	// Precompile the regexps, report the error
-	ignoreSigRegexp, err := compileRegexps(cfg.IgnoreSigRegexps)
+	ignoreSigRegexp, err1 := compileRegexps(cfg.IgnoreSigRegexps)
+	ignoreInterfaceRegexps, err2 := compileRegexps(cfg.IgnoreInterfaceRegexps)
 
 	return func(pass *analysis.Pass) (interface{}, error) {
-		if err != nil {
-			return nil, err
+		if err1 != nil {
+			return nil, err1
+		}
+		if err2 != nil {
+			return nil, err2
 		}
 
 		for _, file := range pass.Files {
@@ -120,7 +134,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						// tuple check is required.
 
 						if isError(pass.TypesInfo.TypeOf(expr)) {
-							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp)
+							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
 							return true
 						}
 
@@ -138,7 +152,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 								return true
 							}
 							if isError(v.Type()) {
-								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp)
+								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
 								return true
 							}
 						}
@@ -200,7 +214,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						return true
 					}
 
-					reportUnwrapped(pass, call, ident.NamePos, cfg, ignoreSigRegexp)
+					reportUnwrapped(pass, call, ident.NamePos, cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
 				}
 
 				return true
@@ -213,7 +227,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 
 // Report unwrapped takes a call expression and an identifier and reports
 // if the call is unwrapped.
-func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexps []*regexp.Regexp) {
+func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexpsSig []*regexp.Regexp, regexpsInter []*regexp.Regexp) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
@@ -224,15 +238,18 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 
 	if contains(cfg.IgnoreSigs, fnSig) {
 		return
-	} else if containsMatch(regexps, fnSig) {
+	} else if containsMatch(regexpsSig, fnSig) {
 		return
 	}
 
 	// Check if the underlying type of the "x" in x.y.z is an interface, as
 	// errors returned from interface types should be wrapped.
 	if isInterface(pass, sel) {
-		pass.Reportf(tokenPos, "error returned from interface method should be wrapped: sig: %s", fnSig)
-		return
+		if containsMatch(regexpsInter, types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string { return p.Name() })) {
+		} else {
+			pass.Reportf(tokenPos, "error returned from interface method should be wrapped: sig: %s", fnSig)
+			return
+		}
 	}
 
 	// Check whether the function being called comes from another package,
@@ -247,7 +264,11 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 // isInterface returns whether the function call is one defined on an interface.
 func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 	_, ok := pass.TypesInfo.TypeOf(sel.X).Underlying().(*types.Interface)
-
+	if ok {
+		fmt.Println(types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string {
+			return p.Name()
+		}))
+	}
 	return ok
 }
 
