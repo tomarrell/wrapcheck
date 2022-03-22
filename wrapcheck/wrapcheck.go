@@ -5,8 +5,6 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"log"
-	"os"
 	"regexp"
 	"strings"
 
@@ -101,15 +99,25 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	// Precompile the regexps, report the error
-	ignoreSigRegexp, err1 := compileRegexps(cfg.IgnoreSigRegexps)
-	ignoreInterfaceRegexps, err2 := compileRegexps(cfg.IgnoreInterfaceRegexps)
+	var (
+		ignoreSigRegexp        []*regexp.Regexp
+		ignoreInterfaceRegexps []*regexp.Regexp
+		ignorePackageGlobs     []glob.Glob
+		err                    error
+	)
+
+	ignoreSigRegexp, err = compileRegexps(cfg.IgnoreSigRegexps)
+	if err == nil {
+		ignoreInterfaceRegexps, err = compileRegexps(cfg.IgnoreInterfaceRegexps)
+	}
+	if err == nil {
+		ignorePackageGlobs, err = compileGlobs(cfg.IgnorePackageGlobs)
+
+	}
 
 	return func(pass *analysis.Pass) (interface{}, error) {
-		if err1 != nil {
-			return nil, err1
-		}
-		if err2 != nil {
-			return nil, err2
+		if err != nil {
+			return nil, err
 		}
 
 		for _, file := range pass.Files {
@@ -134,7 +142,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						// tuple check is required.
 
 						if isError(pass.TypesInfo.TypeOf(expr)) {
-							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
+							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps, ignorePackageGlobs)
 							return true
 						}
 
@@ -152,7 +160,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 								return true
 							}
 							if isError(v.Type()) {
-								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
+								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps, ignorePackageGlobs)
 								return true
 							}
 						}
@@ -214,7 +222,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						return true
 					}
 
-					reportUnwrapped(pass, call, ident.NamePos, cfg, ignoreSigRegexp, ignoreInterfaceRegexps)
+					reportUnwrapped(pass, call, ident.NamePos, cfg, ignoreSigRegexp, ignoreInterfaceRegexps, ignorePackageGlobs)
 				}
 
 				return true
@@ -227,7 +235,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 
 // Report unwrapped takes a call expression and an identifier and reports
 // if the call is unwrapped.
-func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexpsSig []*regexp.Regexp, regexpsInter []*regexp.Regexp) {
+func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexpsSig []*regexp.Regexp, regexpsInter []*regexp.Regexp, pkgGlobs []glob.Glob) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
@@ -243,9 +251,11 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 	}
 
 	// Check if the underlying type of the "x" in x.y.z is an interface, as
-	// errors returned from interface types should be wrapped.
+	// errors returned from interface types should be wrapped, unless ignored
+	// as per `ignoreInterfaceRegexps`
 	if isInterface(pass, sel) {
-		if containsMatch(regexpsInter, types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string { return p.Name() })) {
+		name := types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string { return p.Name() })
+		if containsMatch(regexpsInter, name) {
 		} else {
 			pass.Reportf(tokenPos, "error returned from interface method should be wrapped: sig: %s", fnSig)
 			return
@@ -255,7 +265,7 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 	// Check whether the function being called comes from another package,
 	// as functions called across package boundaries which returns errors
 	// should be wrapped
-	if isFromOtherPkg(pass, sel, cfg) {
+	if isFromOtherPkg(pass, sel, pkgGlobs) {
 		pass.Reportf(tokenPos, "error returned from external package is unwrapped: sig: %s", fnSig)
 		return
 	}
@@ -271,20 +281,11 @@ func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 // isFromotherPkg returns whether the function is defined in the package
 // currently under analysis or is considered external. It will ignore packages
 // defined in config.IgnorePackageGlobs.
-func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, config WrapcheckConfig) bool {
+func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.Glob) bool {
 	// The package of the function that we are calling which returns the error
 	fn := pass.TypesInfo.ObjectOf(sel.Sel)
-
-	for _, globString := range config.IgnorePackageGlobs {
-		g, err := glob.Compile(globString)
-		if err != nil {
-			log.Printf("unable to parse glob: %s\n", globString)
-			os.Exit(1)
-		}
-
-		if g.Match(fn.Pkg().Path()) {
-			return false
-		}
+	if containsMatchGlob(pkgGlobs, fn.Pkg().Path()) {
+		return false
 	}
 
 	// If it's not a package name, then we should check the selector to make sure
@@ -367,6 +368,15 @@ func containsMatch(regexps []*regexp.Regexp, el string) bool {
 	return false
 }
 
+func containsMatchGlob(globs []glob.Glob, el string) bool {
+	for _, g := range globs {
+		if g.Match(el) {
+			return true
+		}
+	}
+	return false
+}
+
 // isError returns whether or not the provided type interface is an error
 func isError(typ types.Type) bool {
 	if typ == nil {
@@ -400,4 +410,19 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 	}
 
 	return compiledRegexps, nil
+}
+
+// compileGlobs compiles a set of globs, returning them for use,
+// or the first encountered error due to an invalid expression.
+func compileGlobs(globs []string) ([]glob.Glob, error) {
+	var compiledGlobs []glob.Glob
+	for _, globString := range globs {
+		glob, err := glob.Compile(globString)
+		if err != nil {
+			return nil, fmt.Errorf("unable to compile globs %s: %v\n", glob, err)
+		}
+
+		compiledGlobs = append(compiledGlobs, glob)
+	}
+	return compiledGlobs, nil
 }

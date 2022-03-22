@@ -18,7 +18,7 @@ func do(fn errorer) error {
 	var str string
 	err := fn.Decode(&str)
 	if err != nil {
-		return err // errorer interface ignored
+		return err // errorer interface ignored as per `ignoreInterfaceRegexps`
 	}
 
 	return nil
