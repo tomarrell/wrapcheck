@@ -52,6 +52,12 @@ ignoreSigRegexps:
 ignorePackageGlobs:
 - encoding/*
 - github.com/pkg/*
+
+# ignoreInterfaceRegexps defines a list of regular expressions which, if matched
+# to a underlying interface name, will ignore unwrapped errors returned from a
+# function whose call is defined on the given interface.
+ignoreInterfaceRegexps:
+- ^(?i)c(?-i)ach(ing|e)
 ```
 
 ## Usage
