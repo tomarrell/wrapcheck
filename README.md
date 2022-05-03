@@ -121,7 +121,7 @@ func (db *DB) getUserByID(userID string) (User, error) {
 
 	var u User
 	if err := db.Conn.Get(&u, sql, userID); err != nil {
-		return User{}, fmt.Errorf("failed to get user by ID: %v", err) // No error!
+		return User{}, fmt.Errorf("failed to get user by ID: %w", err) // No error!
 	}
 
 	return u, nil
@@ -132,7 +132,7 @@ func (db *DB) getItemByID(itemID string) (Item, error) {
 
 	var i Item
 	if err := db.Conn.Get(&i, sql, itemID); err != nil {
-		return Item{}, fmt.Errorf("failed to get item by ID: %v", err) // No error!
+		return Item{}, fmt.Errorf("failed to get item by ID: %w", err) // No error!
 	}
 
 	return i, nil
