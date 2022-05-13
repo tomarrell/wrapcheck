@@ -98,27 +98,23 @@ func NewAnalyzer(cfg WrapcheckConfig) *analysis.Analyzer {
 }
 
 func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
+	// Precompile the regexps, report the error
+	var (
+		ignoreSigRegexp        []*regexp.Regexp
+		ignoreInterfaceRegexps []*regexp.Regexp
+		ignorePackageGlobs     []glob.Glob
+		err                    error
+	)
+
+	ignoreSigRegexp, err = compileRegexps(cfg.IgnoreSigRegexps)
+	if err == nil {
+		ignoreInterfaceRegexps, err = compileRegexps(cfg.IgnoreInterfaceRegexps)
+	}
+	if err == nil {
+		ignorePackageGlobs, err = compileGlobs(cfg.IgnorePackageGlobs)
+	}
 
 	return func(pass *analysis.Pass) (interface{}, error) {
-		// Precompile the regexps, report the error
-		var (
-			ignoreSigRegexp        []*regexp.Regexp
-			ignoreInterfaceRegexps []*regexp.Regexp
-			ignorePackageGlobs     []glob.Glob
-			err                    error
-		)
-
-		ignoreSigRegexp, err = compileRegexps(cfg.IgnoreSigRegexps)
-		if err != nil {
-			return nil, err
-		}
-
-		ignoreInterfaceRegexps, err = compileRegexps(cfg.IgnoreInterfaceRegexps)
-		if err != nil {
-			return nil, err
-		}
-
-		ignorePackageGlobs, err = compileGlobs(cfg.IgnorePackageGlobs)
 		if err != nil {
 			return nil, err
 		}
