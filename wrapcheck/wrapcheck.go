@@ -74,7 +74,7 @@ type WrapcheckConfig struct {
 	// to a underlying interface name, will ignore unwrapped errors returned from a
 	// function whose call is defined on the given interface.
 	//
-	// For example, an ignoreInterfaceRegexps of `[]string{"Transac(tor|tion)"}`` will ignore errors
+	// For example, an ignoreInterfaceRegexps of `[]string{"Transac(tor|tion)"}` will ignore errors
 	// returned from any function whose call is defined on a interface named 'Transactor'
 	// or 'Transaction' due to the name matching the regular expression `Transac(tor|tion)`.
 	IgnoreInterfaceRegexps []string `mapstructure:"ignoreInterfaceRegexps" yaml:"ignoreInterfaceRegexps"`
@@ -112,7 +112,6 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	}
 	if err == nil {
 		ignorePackageGlobs, err = compileGlobs(cfg.IgnorePackageGlobs)
-
 	}
 
 	return func(pass *analysis.Pass) (interface{}, error) {
@@ -305,7 +304,7 @@ func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.
 // `=`. This does not include `var` statements. This function will return nil if
 // the only declaration is a `var` (aka ValueSpec) declaration.
 func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) *ast.AssignStmt {
-	// A slice containing all the assignments which contain an identifer
+	// A slice containing all the assignments which contain an identifier
 	// referring to the source declaration of the error. This is to catch
 	// cases where err is defined once, and then reassigned multiple times
 	// within the same block. In these cases, we should check the method of
@@ -399,14 +398,14 @@ func isUnresolved(file *ast.File, ident *ast.Ident) bool {
 // compileRegexps compiles a set of regular expressions returning them for use,
 // or the first encountered error due to an invalid expression.
 func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
-	var compiledRegexps []*regexp.Regexp
-	for _, reg := range regexps {
+	compiledRegexps := make([]*regexp.Regexp, len(regexps))
+	for idx, reg := range regexps {
 		re, err := regexp.Compile(reg)
 		if err != nil {
 			return nil, fmt.Errorf("unable to compile regexp %s: %v\n", reg, err)
 		}
 
-		compiledRegexps = append(compiledRegexps, re)
+		compiledRegexps[idx] = re
 	}
 
 	return compiledRegexps, nil
@@ -415,14 +414,14 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 // compileGlobs compiles a set of globs, returning them for use,
 // or the first encountered error due to an invalid expression.
 func compileGlobs(globs []string) ([]glob.Glob, error) {
-	var compiledGlobs []glob.Glob
-	for _, globString := range globs {
+	compiledGlobs := make([]glob.Glob, len(globs))
+	for idx, globString := range globs {
 		glob, err := glob.Compile(globString)
 		if err != nil {
 			return nil, fmt.Errorf("unable to compile globs %s: %v\n", glob, err)
 		}
 
-		compiledGlobs = append(compiledGlobs, glob)
+		compiledGlobs[idx] = glob
 	}
 	return compiledGlobs, nil
 }
