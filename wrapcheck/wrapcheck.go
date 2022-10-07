@@ -234,7 +234,16 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 
 // Report unwrapped takes a call expression and an identifier and reports
 // if the call is unwrapped.
-func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos, cfg WrapcheckConfig, regexpsSig []*regexp.Regexp, regexpsInter []*regexp.Regexp, pkgGlobs []glob.Glob) {
+func reportUnwrapped(
+	pass *analysis.Pass,
+	call *ast.CallExpr,
+	tokenPos token.Pos,
+	cfg WrapcheckConfig,
+	regexpsSig []*regexp.Regexp,
+	regexpsInter []*regexp.Regexp,
+	pkgGlobs []glob.Glob,
+) {
+
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
@@ -242,7 +251,6 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 
 	// Check for ignored signatures
 	fnSig := pass.TypesInfo.ObjectOf(sel.Sel).String()
-
 	if contains(cfg.IgnoreSigs, fnSig) {
 		return
 	} else if containsMatch(regexpsSig, fnSig) {
@@ -253,9 +261,9 @@ func reportUnwrapped(pass *analysis.Pass, call *ast.CallExpr, tokenPos token.Pos
 	// errors returned from interface types should be wrapped, unless ignored
 	// as per `ignoreInterfaceRegexps`
 	if isInterface(pass, sel) {
+		pkgPath := pass.TypesInfo.ObjectOf(sel.Sel).Pkg().Path()
 		name := types.TypeString(pass.TypesInfo.TypeOf(sel.X), func(p *types.Package) string { return p.Name() })
-		if containsMatch(regexpsInter, name) {
-		} else {
+		if !containsMatch(regexpsInter, name) && !containsMatchGlob(pkgGlobs, pkgPath) {
 			pass.Reportf(tokenPos, "error returned from interface method should be wrapped: sig: %s", fnSig)
 			return
 		}
@@ -318,6 +326,7 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 				if !isError(pass.TypesInfo.TypeOf(expr)) {
 					continue
 				}
+
 				if assIdent, ok := expr.(*ast.Ident); ok {
 					if assIdent.Obj == nil || returnIdent.Obj == nil {
 						// If we can't find the Obj for one of the identifiers, just skip
@@ -341,6 +350,7 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 		if ass.Pos() > returnIdent.Pos() {
 			break
 		}
+
 		mostRecentAssign = ass
 	}
 
@@ -373,6 +383,7 @@ func containsMatchGlob(globs []glob.Glob, el string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
