@@ -1,6 +1,6 @@
 module github.com/tomarrell/wrapcheck/v2
 
-go 1.21
+go 1.22.0
 
 require (
 	github.com/gobwas/glob v0.2.3
