@@ -40,6 +40,16 @@ ignoreSigs:
 - .WithMessagef(
 - .WithStack(
 
+
+# An array of strings specifying additional substrings of signatures to ignore.
+# Unlike ignoreSigs, this option extends the default set (or the set specified
+# in ignoreSigs) without replacing it entirely. This allows you to add specific
+# signatures to the ignore list while retaining the defaults or any items in
+# ignoreSigs.
+extraIgnoreSigs:
+- .CustomError(
+- .SpecificWrap(
+
 # An array of strings which specify regular expressions of signatures to ignore.
 # This is similar to the ignoreSigs configuration above, but gives slightly more
 # flexibility.
