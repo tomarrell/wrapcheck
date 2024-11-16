@@ -40,7 +40,6 @@ ignoreSigs:
 - .WithMessagef(
 - .WithStack(
 
-
 # An array of strings specifying additional substrings of signatures to ignore.
 # Unlike ignoreSigs, this option extends the default set (or the set specified
 # in ignoreSigs) without replacing it entirely. This allows you to add specific
