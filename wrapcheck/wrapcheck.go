@@ -442,7 +442,7 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 	for idx, reg := range regexps {
 		re, err := regexp.Compile(reg)
 		if err != nil {
-			return nil, fmt.Errorf("unable to compile regexp %s: %v\n", reg, err)
+			return nil, fmt.Errorf("unable to compile regexp %s: %v", reg, err)
 		}
 
 		compiledRegexps[idx] = re
@@ -458,7 +458,7 @@ func compileGlobs(globs []string) ([]glob.Glob, error) {
 	for idx, globString := range globs {
 		glob, err := glob.Compile(globString)
 		if err != nil {
-			return nil, fmt.Errorf("unable to compile globs %s: %v\n", glob, err)
+			return nil, fmt.Errorf("unable to compile globs %s: %v", glob, err)
 		}
 
 		compiledGlobs[idx] = glob
