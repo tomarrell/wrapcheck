@@ -1,0 +1,12 @@
+reportInternalErrors: true
+
+ignoreSigs:
+- .Errorf(
+- errors.New(
+- wrap(
+
+extraIgnoreSigs:
+- wrapError(
+
+ignoreSigRegexps:
+- new.*Error\(

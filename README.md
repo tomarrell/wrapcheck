@@ -68,6 +68,10 @@ ignorePackageGlobs:
 # function whose call is defined on the given interface.
 ignoreInterfaceRegexps:
 - ^(?i)c(?-i)ach(ing|e)
+
+# ReportInternalErrors determines whether wrapcheck should report errors returned
+# from inside the package.
+reportInternalErrors: true
 ```
 
 ## Usage
