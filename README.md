@@ -135,7 +135,7 @@ func (db *DB) getUserByID(userID string) (User, error) {
 
 	var u User
 	if err := db.Conn.Get(&u, sql, userID); err != nil {
-		return User{}, fmt.Errorf("failed to get user by ID: %v", err) // No error!
+		return User{}, fmt.Errorf("failed to get user by ID: %w", err) // No error!
 	}
 
 	return u, nil
@@ -146,7 +146,7 @@ func (db *DB) getItemByID(itemID string) (Item, error) {
 
 	var i Item
 	if err := db.Conn.Get(&i, sql, itemID); err != nil {
-		return Item{}, fmt.Errorf("failed to get item by ID: %v", err) // No error!
+		return Item{}, fmt.Errorf("failed to get item by ID: %w", err) // No error!
 	}
 
 	return i, nil
@@ -211,7 +211,7 @@ func (db *DB) createUser(name, email, city string) error {
 
   if _, err := tx.Exec(sql, name, email, city); err != nil {
     // %v verb preferred to prevent error becoming part of external API
-    return fmt.Errorf("failed to insert user: %v", err)
+    return fmt.Errorf("failed to insert user: %w", err)
   }
 
   return nil
