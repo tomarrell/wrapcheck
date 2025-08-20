@@ -84,6 +84,19 @@ type WrapcheckConfig struct {
 	// or 'Transaction' due to the name matching the regular expression `Transac(tor|tion)`.
 	IgnoreInterfaceRegexps []string `mapstructure:"ignoreInterfaceRegexps" yaml:"ignoreInterfaceRegexps"`
 
+	// IgnoreClosuresInFunctions defines a list of function signature substrings.
+	// If an unwrapped error occurs within a function literal (closure) and that
+	// closure is passed as an argument to a function whose signature contains
+	// one of these substrings, the error will be ignored.
+	//
+	// For example, with a config of `[]string{".CommitWrite("}`, unwrapped errors
+	// within closures passed to any CommitWrite method will be ignored:
+	//
+	//   db.CommitWrite(ctx, func(tx *sql.Tx) error {
+	//       return someExternalCall() // This unwrapped error would be ignored
+	//   })
+	IgnoreClosuresInFunctions []string `mapstructure:"ignoreClosuresInFunctions" yaml:"ignoreClosuresInFunctions"`
+
 	// ReportInternalErrors determines whether wrapcheck should report errors returned
 	// from inside the package.
 	ReportInternalErrors bool `mapstructure:"reportInternalErrors" yaml:"reportInternalErrors"`
@@ -91,10 +104,11 @@ type WrapcheckConfig struct {
 
 func NewDefaultConfig() WrapcheckConfig {
 	return WrapcheckConfig{
-		IgnoreSigs:             DefaultIgnoreSigs,
-		IgnoreSigRegexps:       []string{},
-		IgnorePackageGlobs:     []string{},
-		IgnoreInterfaceRegexps: []string{},
+		IgnoreSigs:                DefaultIgnoreSigs,
+		IgnoreSigRegexps:          []string{},
+		IgnorePackageGlobs:        []string{},
+		IgnoreInterfaceRegexps:    []string{},
+		IgnoreClosuresInFunctions: []string{},
 	}
 }
 
@@ -158,6 +172,12 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 					// to handle it by checking the return params of the function.
 					retFn, ok := expr.(*ast.CallExpr)
 					if ok {
+						// Check if we're inside a function literal and should ignore it
+						// based on the parent function call.
+						if shouldIgnoreClosureError(parents, cfg) {
+							return true
+						}
+
 						// If you go up, and the parent is a FuncLit, then don't report an
 						// error as you are in an anonymous function. If you are inside a
 						// FuncDecl, then continue as normal.
@@ -204,6 +224,11 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 
 					ident, ok := expr.(*ast.Ident)
 					if !ok {
+						return true
+					}
+
+					// Check if we're inside a function literal and should ignore it based on the parent function call.
+					if shouldIgnoreClosureError(parents, cfg) {
 						return true
 					}
 
@@ -344,7 +369,7 @@ func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 	return ok
 }
 
-// isFromotherPkg returns whether the function is defined in the package
+// isFromOtherPkg returns whether the function is defined in the package
 // currently under analysis or is considered external. It will ignore packages
 // defined in config.IgnorePackageGlobs.
 func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.Glob) bool {
@@ -414,6 +439,65 @@ func prevErrAssign(pass *analysis.Pass, file *ast.File, returnIdent *ast.Ident) 
 	}
 
 	return mostRecentAssign
+}
+
+// shouldIgnoreClosureError checks if we're inside a function literal (closure)
+// and that closure is passed to a function that matches the ignored patterns.
+func shouldIgnoreClosureError(parents []ast.Node, cfg WrapcheckConfig) bool {
+	if len(cfg.IgnoreClosuresInFunctions) == 0 {
+		return false
+	}
+
+	// Find if we're inside a function literal.
+	var funcLitIndex = -1
+	for i := len(parents) - 1; i >= 0; i-- {
+		if _, ok := parents[i].(*ast.FuncLit); ok {
+			funcLitIndex = i
+			break
+		}
+
+		// If we hit a FuncDecl before finding a FuncLit, we're not in a closure.
+		if _, ok := parents[i].(*ast.FuncDecl); ok {
+			return false
+		}
+	}
+
+	// Not inside a function literal.
+	if funcLitIndex == -1 {
+		return false
+	}
+
+	// The CallExpr should be BEFORE the FuncLit in the parent chain.
+	funcLit := parents[funcLitIndex]
+
+	for i := funcLitIndex - 1; i >= 0; i-- {
+		if callExpr, ok := parents[i].(*ast.CallExpr); ok {
+			// Check if this CallExpr has our FuncLit as an argument.
+			for _, arg := range callExpr.Args {
+				if arg == funcLit {
+					// Get the function signature being called.
+					var fnSig string
+					if sel, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+						fnSig = fmt.Sprintf(".%s(", sel.Sel.Name)
+					} else if ident, ok := callExpr.Fun.(*ast.Ident); ok {
+						fnSig = fmt.Sprintf("%s(", ident.Name)
+					}
+
+					// Check if this signature should be ignored.
+					for _, ignorePattern := range cfg.IgnoreClosuresInFunctions {
+						if strings.Contains(fnSig, ignorePattern) {
+							return true
+						}
+					}
+
+					// Found the call, but it doesn't match ignore patterns.
+					return false
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func contains(slice []string, el string) bool {
