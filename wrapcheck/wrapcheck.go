@@ -87,6 +87,12 @@ type WrapcheckConfig struct {
 	// ReportInternalErrors determines whether wrapcheck should report errors returned
 	// from inside the package.
 	ReportInternalErrors bool `mapstructure:"reportInternalErrors" yaml:"reportInternalErrors"`
+
+	// ReportLocalModule determines whether wrapcheck should report errors returned
+	// from packages within the module being analyzed. The package currently being
+	// analyzed is controlled separately by ReportInternalErrors. It defaults to
+	// true.
+	ReportLocalModule bool `mapstructure:"reportLocalModule" yaml:"reportLocalModule"`
 }
 
 func NewDefaultConfig() WrapcheckConfig {
@@ -95,6 +101,7 @@ func NewDefaultConfig() WrapcheckConfig {
 		IgnoreSigRegexps:       []string{},
 		IgnorePackageGlobs:     []string{},
 		IgnoreInterfaceRegexps: []string{},
+		ReportLocalModule:      true,
 	}
 }
 
@@ -298,7 +305,15 @@ func reportUnwrapped(
 		return
 	}
 
-	fnSig := pass.TypesInfo.ObjectOf(sel.Sel).String()
+	fn := pass.TypesInfo.ObjectOf(sel.Sel)
+	fnSig := fn.String()
+
+	// Packages in the current module are not external packages. Keep this
+	// separate from ReportInternalErrors, which controls the package currently
+	// being analyzed.
+	if !cfg.ReportLocalModule && isFromOtherPackageInLocalModule(pass, fn.Pkg()) {
+		return
+	}
 
 	// Check for ignored signatures
 	if checkSignature(cfg, regexpsSig, fnSig) {
@@ -361,6 +376,22 @@ func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.
 	}
 
 	return true
+}
+
+// isFromOtherPackageInLocalModule reports whether pkg belongs to the module
+// currently being analyzed, but is not the package currently being analyzed.
+// Package paths are hierarchical, so the module path must be followed by a
+// slash when checking subpackages.
+func isFromOtherPackageInLocalModule(pass *analysis.Pass, pkg *types.Package) bool {
+	if pass.Module == nil || pass.Module.Path == "" || pass.Pkg == nil || pkg == nil {
+		return false
+	}
+
+	if pkg.Path() == pass.Pkg.Path() {
+		return false
+	}
+
+	return pkg.Path() == pass.Module.Path || strings.HasPrefix(pkg.Path(), pass.Module.Path+"/")
 }
 
 // prevErrAssign traverses the AST of a file looking for the most recent

@@ -15,6 +15,7 @@ func main() {
 	viper.AddConfigPath(".")
 
 	viper.SetDefault("ignoreSigs", wrapcheck.DefaultIgnoreSigs)
+	viper.SetDefault("reportLocalModule", true)
 
 	// Read in config, ignore if the file isn't found and use defaults.
 	if err := viper.ReadInConfig(); err != nil {
@@ -23,7 +24,7 @@ func main() {
 		}
 	}
 
-	var cfg wrapcheck.WrapcheckConfig
+	cfg := wrapcheck.NewDefaultConfig()
 	if err := viper.Unmarshal(&cfg); err != nil {
 		log.Fatalf("failed to unmarshal config: %v", err)
 	}
