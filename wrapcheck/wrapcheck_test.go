@@ -16,6 +16,10 @@ import (
 // analysis tests to skip this directory due to needing explicit tests.
 const skipfile = "analysistest_skip"
 
+func TestNewDefaultConfig(t *testing.T) {
+	assert.True(t, NewDefaultConfig().ReportLocalModule)
+}
+
 func TestAnalyzer(t *testing.T) {
 	// Load the dirs under ./testdata
 	p, err := filepath.Abs("./testdata")
@@ -48,7 +52,7 @@ func TestAnalyzer(t *testing.T) {
 				configFile, err := os.ReadFile(configPath)
 				assert.NoError(t, err)
 
-				var config WrapcheckConfig
+				config := NewDefaultConfig()
 				assert.NoError(t, yaml.Unmarshal(configFile, &config))
 				analysistest.Run(t, dirPath, NewAnalyzer(config))
 			} else {
