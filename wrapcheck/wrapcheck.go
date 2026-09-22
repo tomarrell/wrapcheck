@@ -111,7 +111,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	var (
 		ignoreSigRegexp        []*regexp.Regexp
 		ignoreInterfaceRegexps []*regexp.Regexp
-		ignorePackageGlobs     []glob.Glob
+		ignorePackageGlobs     []*glob.Pattern
 		err                    error
 	)
 
@@ -274,7 +274,7 @@ func reportUnwrapped(
 	cfg WrapcheckConfig,
 	regexpsSig []*regexp.Regexp,
 	regexpsInter []*regexp.Regexp,
-	pkgGlobs []glob.Glob,
+	pkgGlobs []*glob.Pattern,
 ) {
 
 	if cfg.ReportInternalErrors {
@@ -347,7 +347,7 @@ func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 // isFromotherPkg returns whether the function is defined in the package
 // currently under analysis or is considered external. It will ignore packages
 // defined in config.IgnorePackageGlobs.
-func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.Glob) bool {
+func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []*glob.Pattern) bool {
 	// The package of the function that we are calling which returns the error
 	fn := pass.TypesInfo.ObjectOf(sel.Sel)
 	if containsMatchGlob(pkgGlobs, fn.Pkg().Path()) {
@@ -436,7 +436,7 @@ func containsMatch(regexps []*regexp.Regexp, el string) bool {
 	return false
 }
 
-func containsMatchGlob(globs []glob.Glob, el string) bool {
+func containsMatchGlob(globs []*glob.Pattern, el string) bool {
 	for _, g := range globs {
 		if g.Match(el) {
 			return true
@@ -483,8 +483,8 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 
 // compileGlobs compiles a set of globs, returning them for use,
 // or the first encountered error due to an invalid expression.
-func compileGlobs(globs []string) ([]glob.Glob, error) {
-	compiledGlobs := make([]glob.Glob, len(globs))
+func compileGlobs(globs []string) ([]*glob.Pattern, error) {
+	compiledGlobs := make([]*glob.Pattern, len(globs))
 	for idx, globString := range globs {
 		glob, err := glob.Compile(globString)
 		if err != nil {

@@ -3,7 +3,7 @@ module github.com/tomarrell/wrapcheck/v2
 go 1.24.0
 
 require (
-	github.com/gobwas/glob v0.2.3
+	github.com/gobwas/glob v1.0.0
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.7.2
 	golang.org/x/tools v0.39.0
