@@ -10,7 +10,7 @@ during return to help identify the error source during debugging.
 
 ## Install
 
-Go `>= v1.27.1`
+Go `>= v1.24.0`
 ```bash
 $ go install github.com/tomarrell/wrapcheck/v2/cmd/wrapcheck@v2
 ```
