@@ -17,3 +17,8 @@ jobs:
 
     - name: Test
       run: go test ./...
+
+    - name: Test with gobwas/glob v1
+      run: |
+        go get github.com/gobwas/glob@v1.0.0
+        go test ./...

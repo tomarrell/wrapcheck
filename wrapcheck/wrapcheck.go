@@ -111,7 +111,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 	var (
 		ignoreSigRegexp        []*regexp.Regexp
 		ignoreInterfaceRegexps []*regexp.Regexp
-		ignorePackageGlobs     []glob.Glob
+		ignorePackageGlobs     []globMatcher
 		err                    error
 	)
 
@@ -274,7 +274,7 @@ func reportUnwrapped(
 	cfg WrapcheckConfig,
 	regexpsSig []*regexp.Regexp,
 	regexpsInter []*regexp.Regexp,
-	pkgGlobs []glob.Glob,
+	pkgGlobs []globMatcher,
 ) {
 
 	if cfg.ReportInternalErrors {
@@ -347,7 +347,7 @@ func isInterface(pass *analysis.Pass, sel *ast.SelectorExpr) bool {
 // isFromotherPkg returns whether the function is defined in the package
 // currently under analysis or is considered external. It will ignore packages
 // defined in config.IgnorePackageGlobs.
-func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []glob.Glob) bool {
+func isFromOtherPkg(pass *analysis.Pass, sel *ast.SelectorExpr, pkgGlobs []globMatcher) bool {
 	// The package of the function that we are calling which returns the error
 	fn := pass.TypesInfo.ObjectOf(sel.Sel)
 	if containsMatchGlob(pkgGlobs, fn.Pkg().Path()) {
@@ -436,7 +436,7 @@ func containsMatch(regexps []*regexp.Regexp, el string) bool {
 	return false
 }
 
-func containsMatchGlob(globs []glob.Glob, el string) bool {
+func containsMatchGlob(globs []globMatcher, el string) bool {
 	for _, g := range globs {
 		if g.Match(el) {
 			return true
@@ -481,17 +481,24 @@ func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
 	return compiledRegexps, nil
 }
 
+// globMatcher is the subset of a compiled gobwas/glob pattern used by the
+// analyzer. Both glob.Glob (v0) and *glob.Pattern (v1) satisfy it, so the
+// analyzer builds against either version of the module.
+type globMatcher interface {
+	Match(s string) bool
+}
+
 // compileGlobs compiles a set of globs, returning them for use,
 // or the first encountered error due to an invalid expression.
-func compileGlobs(globs []string) ([]glob.Glob, error) {
-	compiledGlobs := make([]glob.Glob, len(globs))
+func compileGlobs(globs []string) ([]globMatcher, error) {
+	compiledGlobs := make([]globMatcher, len(globs))
 	for idx, globString := range globs {
-		glob, err := glob.Compile(globString)
+		g, err := glob.Compile(globString)
 		if err != nil {
-			return nil, fmt.Errorf("unable to compile globs %s: %v\n", glob, err)
+			return nil, fmt.Errorf("unable to compile glob %q: %w", globString, err)
 		}
 
-		compiledGlobs[idx] = glob
+		compiledGlobs[idx] = g
 	}
 	return compiledGlobs, nil
 }
