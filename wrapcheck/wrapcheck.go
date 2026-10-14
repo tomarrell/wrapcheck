@@ -12,6 +12,8 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+var errorType = types.Universe.Lookup("error").Type()
+
 var DefaultIgnoreSigs = []string{
 	".Errorf(",
 	"errors.New(",
@@ -153,7 +155,7 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 				}
 
 				// Iterate over the values to be returned looking for errors
-				for _, expr := range ret.Results {
+				for idx, expr := range ret.Results {
 					// Check if the return expression is a function call, if it is, we need
 					// to handle it by checking the return params of the function.
 					retFn, ok := expr.(*ast.CallExpr)
@@ -173,7 +175,8 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 						// match an error within multiple return values, for that, the below
 						// tuple check is required.
 
-						if isError(pass.TypesInfo.TypeOf(expr)) {
+						if isError(pass.TypesInfo.TypeOf(expr)) &&
+							isWrappableResult(pass, parents, idx) {
 							reportUnwrapped(pass, retFn, retFn.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps, ignorePackageGlobs)
 							return true
 						}
@@ -191,14 +194,15 @@ func run(cfg WrapcheckConfig) func(*analysis.Pass) (interface{}, error) {
 							if v == nil {
 								return true
 							}
-							if isError(v.Type()) {
+							if isError(v.Type()) && isWrappableResult(pass, parents, i) {
 								reportUnwrapped(pass, retFn, expr.Pos(), cfg, ignoreSigRegexp, ignoreInterfaceRegexps, ignorePackageGlobs)
 								return true
 							}
 						}
 					}
 
-					if !isError(pass.TypesInfo.TypeOf(expr)) {
+					if !isError(pass.TypesInfo.TypeOf(expr)) ||
+						!isWrappableResult(pass, parents, idx) {
 						continue
 					}
 
@@ -446,18 +450,41 @@ func containsMatchGlob(globs []glob.Glob, el string) bool {
 	return false
 }
 
-// isError returns whether or not the provided type is an error or implements the error interface
+// isError returns whether or not the provided type implements the error
+// interface
 func isError(typ types.Type) bool {
 	if typ == nil {
 		return false
 	}
 
-	if typ.String() == "error" {
-		return true
+	return types.Implements(typ, errorType.Underlying().(*types.Interface))
+}
+
+// isWrappableResult returns whether the result at index idx of the innermost
+// function enclosing the return statement can hold a wrapped error. Wrapping
+// produces an error, so the result type must be one that error is assignable
+// to.
+func isWrappableResult(pass *analysis.Pass, parents []ast.Node, idx int) bool {
+	for i := len(parents) - 1; i >= 0; i-- {
+		var typ types.Type
+		switch fn := parents[i].(type) {
+		case *ast.FuncLit:
+			typ = pass.TypesInfo.TypeOf(fn)
+		case *ast.FuncDecl:
+			typ = pass.TypesInfo.TypeOf(fn.Name)
+		default:
+			continue
+		}
+
+		sig, ok := typ.(*types.Signature)
+		if !ok || idx >= sig.Results().Len() {
+			return false
+		}
+
+		return types.AssignableTo(errorType, sig.Results().At(idx).Type())
 	}
 
-	errorInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
-	return types.Implements(typ, errorInterface)
+	return false
 }
 
 func isUnresolved(file *ast.File, ident *ast.Ident) bool {
