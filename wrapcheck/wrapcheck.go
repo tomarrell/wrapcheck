@@ -446,13 +446,18 @@ func containsMatchGlob(globs []glob.Glob, el string) bool {
 	return false
 }
 
-// isError returns whether or not the provided type interface is an error
+// isError returns whether or not the provided type is an error or implements the error interface
 func isError(typ types.Type) bool {
 	if typ == nil {
 		return false
 	}
 
-	return typ.String() == "error"
+	if typ.String() == "error" {
+		return true
+	}
+
+	errorInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
+	return types.Implements(typ, errorInterface)
 }
 
 func isUnresolved(file *ast.File, ident *ast.Ident) bool {
