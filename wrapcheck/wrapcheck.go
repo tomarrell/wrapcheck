@@ -88,11 +88,11 @@ type WrapcheckConfig struct {
 	// from inside the package.
 	ReportInternalErrors bool `mapstructure:"reportInternalErrors" yaml:"reportInternalErrors"`
 
-	// ReportLocalModule determines whether wrapcheck should report errors returned
-	// from packages within the module being analyzed. The package currently being
-	// analyzed is controlled separately by ReportInternalErrors. It defaults to
-	// true.
-	ReportLocalModule bool `mapstructure:"reportLocalModule" yaml:"reportLocalModule"`
+	// IgnoreLocalModule determines whether wrapcheck should ignore errors returned
+	// from other packages within the module being analyzed. The package currently
+	// being analyzed is controlled separately by ReportInternalErrors. It defaults
+	// to false.
+	IgnoreLocalModule bool `mapstructure:"ignoreLocalModule" yaml:"ignoreLocalModule"`
 }
 
 func NewDefaultConfig() WrapcheckConfig {
@@ -101,7 +101,6 @@ func NewDefaultConfig() WrapcheckConfig {
 		IgnoreSigRegexps:       []string{},
 		IgnorePackageGlobs:     []string{},
 		IgnoreInterfaceRegexps: []string{},
-		ReportLocalModule:      true,
 	}
 }
 
@@ -311,7 +310,7 @@ func reportUnwrapped(
 	// Packages in the current module are not external packages. Keep this
 	// separate from ReportInternalErrors, which controls the package currently
 	// being analyzed.
-	if !cfg.ReportLocalModule && isFromOtherPackageInLocalModule(pass, fn.Pkg()) {
+	if cfg.IgnoreLocalModule && isFromOtherPackageInLocalModule(pass, fn.Pkg()) {
 		return
 	}
 

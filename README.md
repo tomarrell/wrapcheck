@@ -73,10 +73,10 @@ ignoreInterfaceRegexps:
 # from inside the package.
 reportInternalErrors: true
 
-# ReportLocalModule determines whether wrapcheck should report errors returned
-# from packages within the module being analyzed. The package currently being
-# analyzed is controlled separately by reportInternalErrors.
-reportLocalModule: true
+# IgnoreLocalModule determines whether wrapcheck should ignore errors returned
+# from other packages within the module being analyzed. The package currently
+# being analyzed is controlled separately by reportInternalErrors.
+ignoreLocalModule: false
 ```
 
 ## Usage

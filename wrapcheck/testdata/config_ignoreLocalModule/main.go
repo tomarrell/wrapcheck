@@ -1,6 +1,6 @@
 package main
 
-import "example.com/reportlocal/local"
+import "example.com/ignorelocal/local"
 
 func main() {
 	_ = do()
@@ -8,7 +8,7 @@ func main() {
 
 func do() error {
 	if err := local.Error(); err != nil {
-		return err // want `error returned from external package is unwrapped`
+		return err
 	}
 
 	return nil
